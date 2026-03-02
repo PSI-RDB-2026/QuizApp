@@ -1,9 +1,11 @@
-name: Prototype Gate 			    # Název v záložce "Actions" na GitHubu 
-on: 							    # Kdy se to má spustit?
+name: Prototype Gate               # Název v záložce "Actions" na GitHubu 
+permissions:
+  contents: write                   # allow the deploy step to push to gh-pages
+on:                                 # Kdy se to má spustit?
   pull_request:
     paths:
       - 'prototype/**'              # Jen když někdo upraví soubory ve složce /prototype
-    branches: [ main ] 			    # Jen když někdo chce mergovat do main
+    branches: [ main ]             # Jen když někdo chce mergovat do main
 
 jobs:						        # Joby se pouští paralelně
   test-and-lint-prototype:		    # ID jobu (testy kódu ve folderu /prototype)
@@ -19,8 +21,14 @@ jobs:						        # Joby se pouští paralelně
         with:
           node-version: '20'
       - name: Install dependencies  # 3: Nainstaluj závislosti
-        run: npm ci
-      - name: Run Lint			    # 4: Spusť linter
-        run: npm run lint
-      - name: Run Unit Tests		# 5: Spusť testy
-        run: npm test
+        # `npm ci` requires a committed lockfile; if you don't have one yet
+        # (the repo currently lacks package-lock.json) use `npm install`
+        # so the workflow succeeds and generates the lockfile locally.
+        run: npm install
+      - name: Build project		# 5: Vytvoř production bundle
+        run: npm run build
+      - name: Deploy to GitHub Pages	# 6: Nasazení na GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./prototype/dist

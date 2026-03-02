@@ -1,0 +1,5 @@
+{
+  "name": "AZ Quiz Master",
+  "description": "A gamified responsive quiz web application with multiple game modes including Classic, Pyramid, and Hexagon.",
+  "requestFramePermissions": []
+}
