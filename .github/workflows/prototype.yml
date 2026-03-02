@@ -1,9 +1,11 @@
-name: Prototype Gate 			    # Název v záložce "Actions" na GitHubu 
-on: 							    # Kdy se to má spustit?
+name: Prototype Gate               # Název v záložce "Actions" na GitHubu 
+permissions:
+  contents: write                   # allow the deploy step to push to gh-pages
+on:                                 # Kdy se to má spustit?
   pull_request:
     paths:
       - 'prototype/**'              # Jen když někdo upraví soubory ve složce /prototype
-    branches: [ main ] 			    # Jen když někdo chce mergovat do main
+    branches: [ main ]             # Jen když někdo chce mergovat do main
 
 jobs:						        # Joby se pouští paralelně
   test-and-lint-prototype:		    # ID jobu (testy kódu ve folderu /prototype)
@@ -29,4 +31,4 @@ jobs:						        # Joby se pouští paralelně
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./prototype/dist
