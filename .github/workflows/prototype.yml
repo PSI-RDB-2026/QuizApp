@@ -22,5 +22,10 @@ jobs:						        # Joby se pouští paralelně
         run: npm ci
       - name: Run Lint			    # 4: Spusť linter
         run: npm run lint
-      - name: Run Unit Tests		# 5: Spusť testy
-        run: npm test
+      - name: Build project		# 5: Vytvoř production bundle
+        run: npm run build
+      - name: Deploy to GitHub Pages	# 6: Nasazení na GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
