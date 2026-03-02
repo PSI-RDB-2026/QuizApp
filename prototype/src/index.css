@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary: #4CBB17;
+  --color-primary-dark: #169400;
+  --color-player1: #FF5722;
+  --color-player2: #2196F3;
+  --color-failed: #1f2937;
+}
+
+@layer utilities {
+  .clip-hexagon {
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+}
