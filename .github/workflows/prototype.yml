@@ -7,12 +7,13 @@ on:                                 # Kdy se to má spustit?
       - 'prototype/**'              # Jen když někdo upraví soubory ve složce /prototype
     branches: [ main ]             # Jen když někdo chce mergovat do main
 
+
+env:
+  CI: false
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub automaticky vytvoří tajný token pro každé repo, který umožňuje workflow komunikovat s GitHub API (např. pro nasazení na GitHub Pages)
 jobs:						        # Joby se pouští paralelně
   test-and-lint-prototype:		    # ID jobu (testy kódu ve folderu /prototype)
     runs-on: ubuntu-latest  		# "Půjč mi od GitHubu čisté Ubuntu"
-    defaults:                       # Defaultní working directory pro všechny steps
-      run:
-        working-directory: ./prototype
     steps:					        # Stepy v rámci jobu běží sekvenčně
       - name: Checkout code 		# 1: Stáhni kód z repo do toho Ubuntu
         uses: actions/checkout@v4	# Reference na existující akci
@@ -21,14 +22,10 @@ jobs:						        # Joby se pouští paralelně
         with:
           node-version: '20'
       - name: Install dependencies  # 3: Nainstaluj závislosti
-        # `npm ci` requires a committed lockfile; if you don't have one yet
-        # (the repo currently lacks package-lock.json) use `npm install`
-        # so the workflow succeeds and generates the lockfile locally.
-        run: npm install
+        run: |
+          cd prototype
+          npm install
       - name: Build project		# 5: Vytvoř production bundle
-        run: npm run build
-      - name: Deploy to GitHub Pages	# 6: Nasazení na GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./prototype/dist
+        run: |
+          cd prototype
+          npm run build
