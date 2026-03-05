@@ -29,12 +29,12 @@ flowchart LR
 ## Documentation
 
 - This file contains introduction to the product, local setup of the project and user guide
-- docs/SPECIFICATION.md contains product description: Objectives, planned functional requirements
-- docs/DESIGN.md contains engeneering documentation: Technical architecture, ULM diagrams, API and DB schema
+- [docs/SPECIFICATION.md](./docs/SPECIFICATION.md) contains product description: Objectives, planned functional requirements
+- [docs/DESIGN.md](./docs/DESIGN.md) contains engeneering documentation: Technical architecture, ULM diagrams, API and DB schema
 
 ## Local development
 
-In this time project contains prototype application (prototype/README.md)
+In this time project contains prototype application ([prototype/README.md](./prototype/README.md))
 
 ## Project milestones
 
