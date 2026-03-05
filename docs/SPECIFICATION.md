@@ -47,7 +47,7 @@ graph TD
 
 ## Prototype
 
-Working prototype of this application is available at: https://ai.studio/apps/8f6644ec-ae49-499b-b083-a20b614060b6 (temporarily hosted on Google AI Studio, the final application will be hosted in Azure - inline with the NFRs below).
+Working prototype of this application is available at: [Google AU Studio Build](https://ai.studio/apps/8f6644ec-ae49-499b-b083-a20b614060b6) (temporarily hosted on Google AI Studio, the final application will be hosted in Azure - inline with the NFRs below).
 
 ## Functional Requirements
 
