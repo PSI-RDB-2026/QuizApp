@@ -1,6 +1,6 @@
 # Design documentation: QuizApp
 
-This documet present the technical plan for implementating QuizApp priject.
+This documet present the technical plan for implementating QuizApp project.
 
 ## Architecture
 
@@ -58,8 +58,14 @@ flowchart LR
     Browser -->|HTTP: Login, Get Quiz| Backend
     Browser -->|Store answers locally| Browser
     Browser -->|HTTP: Submit answers| Backend
-    Backend -->|Save| DB
+
+    DB -->|Load Questions| Backend
+
+    Backend ~~~ DB    
+    
     Backend -->|HTTP: Results| Browser
+
+    
 ```
 
 **Communication:** HTTP/REST only. Answers stored locally, submitted once.
@@ -74,7 +80,7 @@ flowchart LR
     DB[(Database)]
 
     P1 -->|HTTP: Create match| Backend
-    Backend -->|Store| DB
+
     P2 -->|HTTP: Accept match| Backend
 
     P1 <-->|WebSocket: Connect| Backend
@@ -85,7 +91,7 @@ flowchart LR
     Backend -->|WebSocket: Score update| P2
 
     P2 -->|HTTP: Submit answer| Backend
-    Backend -->|Save| DB
+    DB -->|Load Question| Backend
     Backend -->|WebSocket: Score update| P1
 ```
 

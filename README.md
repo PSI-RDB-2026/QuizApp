@@ -44,10 +44,10 @@ In this time project contains prototype application ([prototype/README.md](./pro
 
 ## Team
 
-- Dan Keršláger (@)
-- Vlastimil Pálfi (@)
-- Michal Pokorný (@)
-- Jan Reisiegel (@)
+- Dan Keršláger (@DanKerslager)
+- Vlastimil Pálfi (@PalfiVlastimil)
+- Michal Pokorný (@MichalPKN)
+- Jan Reisiegel (@JanReisiegel)
 
 ## Status
 
