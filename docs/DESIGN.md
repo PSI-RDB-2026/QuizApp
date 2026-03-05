@@ -1,6 +1,6 @@
 # Design documentation: QuizApp
 
-This documet present the technical plan for implementating QuizApp project.
+This document presents the technical plan for implementating QuizApp project.
 
 ## Architecture
 
