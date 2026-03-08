@@ -1,7 +1,7 @@
 import type { Route } from "./+types/home";
 import Welcome from "../welcome/welcome";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import React from "react";
 
 export function meta({}: Route.MetaArgs) {
@@ -13,15 +13,22 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
   
-  const [hello, setHello] = useState("Frontend is running!");
+  const [hello, setHello] = useState({ message: "Loading..." });
 
-  const getHello = () => {
-    axios.get("http://localhost:8000/api").then((response) => {
-      console.log(response);
-      setHello(response.data);
-    });
-  }
-
+  useEffect(() => {
+    const getHello = () => {
+      // Use relative path - reverse proxy will handle routing to backend
+      const apiUrl = "/api";
+      axios.get(apiUrl).then((response) => {
+        console.log(response);
+        setHello(response.data);
+      }).catch((error) => {
+        console.error("Error fetching from API:", error);
+        setHello({ message: "Failed to connect to backend" });
+      });
+    };
+    getHello();
+  }, []);
 
   return <Welcome text={hello} />;
 }

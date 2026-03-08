@@ -1,0 +1,45 @@
+services:
+  proxy:
+    image: nginx:alpine
+    container_name: quizapp-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/compose.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - quizapp-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: quizapp-backend
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - quizapp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: quizapp-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - quizapp-network
+
+networks:
+  quizapp-network:
+    driver: bridge
