@@ -16,7 +16,7 @@ app.add_middleware(
 @app.get("/api")
 async def root():
     '''Endpoint for the root path.'''
-    return {"message": "Hello World"}
+    return {"message": "Hello World, V2"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
