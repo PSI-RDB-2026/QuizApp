@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
+import os
 import uvicorn
 
 app = FastAPI()
@@ -12,6 +15,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://quizapp:quizapp_pass@postgres:5432/quizapp",
+)
+
+engine = create_async_engine(DATABASE_URL, echo=False)
+
+async def is_db_available() -> bool:
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+@app.get("/api/health/db")
+async def db_health_check():
+    if await is_db_available():
+        return {"db": "connected"}
+    raise HTTPException(status_code=503, detail="Database is unavailable")
 
 @app.get("/api")
 async def root():
