@@ -1,7 +1,8 @@
 CREATE TABLE "users" (
   "email" varchar PRIMARY KEY,
-  "username" varchar UNIQUE NOT NULL,
-  "password_hash" varchar NOT NULL,
+  "username" varchar UNIQUE,
+  "password_hash" varchar,
+  "google_id" varchar,
   "elo_rating" int DEFAULT 1200,
   "created_at" timestamp DEFAULT (now())
 );
@@ -11,7 +12,7 @@ CREATE TABLE "standard_questions" (
   "initials" varchar NOT NULL,
   "question_text" text NOT NULL,
   "correct_answer" varchar NOT NULL,
-  "theme" varchar,
+  "category" varchar,
   "difficulty" int DEFAULT 1
 );
 
@@ -24,7 +25,6 @@ CREATE TABLE "yes_no_questions" (
 
 CREATE TABLE "matches" (
   "id" uuid PRIMARY KEY,
-  "game_type" varchar NOT NULL,
   "player1_id" uuid NOT NULL,
   "player2_id" uuid NOT NULL,
   "winner_id" uuid,
@@ -53,8 +53,6 @@ COMMENT ON COLUMN "standard_questions"."initials" IS 'e.g., "A", "CH", "K"';
 COMMENT ON COLUMN "standard_questions"."difficulty" IS '1 to 5 scale';
 
 COMMENT ON COLUMN "yes_no_questions"."question_text" IS 'For wrongly answered/contested tiles';
-
-COMMENT ON COLUMN "matches"."game_type" IS 'triangle, hex,...';
 
 COMMENT ON COLUMN "matches"."winner_id" IS 'Null if match is a draw or ongoing';
 
