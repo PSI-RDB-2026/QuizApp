@@ -1,13 +1,16 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from services.UserServices import userServices
-from models.UserModels import LoginRequest, LoginResponse
+from models.UserModels import LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/users")
 
+
 @router.post("/login")
-def login(credentials: LoginRequest):
+def login(credentials: LoginRequest, response: JSONResponse) -> TokenResponse:
     '''Endpoint for user login. 
     It authenticates the user and returns a JWT access token if successful.'''
+    print(credentials)
     authenticated = userServices.authenticate_user(credentials.username, credentials.password)
     if not authenticated:
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -16,5 +19,7 @@ def login(credentials: LoginRequest):
         "sub": user["username"],
         "email": user["email"]
     })
+    # response.headers["Authorization"] = f"Bearer {access_token}"
+    # response.status_code = 202
 
-    return LoginResponse(access_token=access_token)
+    return TokenResponse(access_token=access_token)

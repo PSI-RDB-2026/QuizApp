@@ -4,7 +4,10 @@ import os
 
 ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")  # In a real application, use a secure key and store it safely
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in os.sys.path:
+    os.sys.path.append(current_dir)
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")  # In a real application, use a secure key and store it safely
 
 class userServices:
     '''
@@ -28,7 +31,7 @@ class userServices:
         if user["password"] != password:
             return False
         return True
-    
+
     @staticmethod
     def get_user(username: str):
         '''Get user details by username.
@@ -51,5 +54,6 @@ class userServices:
 
         to_encode.update({"exp": expire})
 
+        print(str(to_encode), SECRET_KEY, ALGORITHM)  # Debugging output
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
