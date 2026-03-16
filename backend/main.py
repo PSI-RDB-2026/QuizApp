@@ -36,6 +36,21 @@ async def db_health_check():
         return {"db": "connected"}
     raise HTTPException(status_code=503, detail="Database is unavailable")
 
+@app.get("/api/questions/random")
+async def get_random_question():
+    async with engine.connect() as conn:
+        result = await conn.execute(text("SELECT * FROM standard_questions ORDER BY RANDOM() LIMIT 1"))
+        question = result.fetchone()
+        if question:
+            return {
+                "id": question.id,
+                "question_text": question.question_text,
+                "answer": question.correct_answer,
+                "category": question.category,
+                "difficulty": question.difficulty
+            }
+        raise HTTPException(status_code=404, detail="No questions found")
+
 @app.get("/api")
 async def root():
     '''Endpoint for the root path.'''

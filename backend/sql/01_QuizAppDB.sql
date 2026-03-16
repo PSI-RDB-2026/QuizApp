@@ -10,7 +10,7 @@ CREATE TABLE "users" (
 CREATE TABLE "standard_questions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "initials" varchar NOT NULL,
-  "question_text" text NOT NULL,
+  "question_text" text NOT NULL UNIQUE,
   "correct_answer" varchar NOT NULL,
   "category" varchar,
   "difficulty" int DEFAULT 1
@@ -18,16 +18,16 @@ CREATE TABLE "standard_questions" (
 
 CREATE TABLE "yes_no_questions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "question_text" text NOT NULL,
+  "question_text" text NOT NULL UNIQUE,
   "correct_answer" boolean NOT NULL,
   "category" varchar
 );
 
 CREATE TABLE "matches" (
   "id" uuid PRIMARY KEY,
-  "player1_id" uuid NOT NULL,
-  "player2_id" uuid NOT NULL,
-  "winner_id" uuid,
+  "player1_id" varchar NOT NULL,
+  "player2_id" varchar NOT NULL,
+  "winner_id" varchar,
   "player1_elo_change" int,
   "player2_elo_change" int,
   "status" varchar NOT NULL DEFAULT 'ongoing',
@@ -38,7 +38,7 @@ CREATE TABLE "matches" (
 CREATE TABLE "match_turns" (
   "id" uuid PRIMARY KEY,
   "match_id" uuid NOT NULL,
-  "player_id" uuid NOT NULL,
+  "player_id" varchar NOT NULL,
   "tile_id" int NOT NULL,
   "standard_question_id" uuid,
   "yes_no_question_id" uuid,
