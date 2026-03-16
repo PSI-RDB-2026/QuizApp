@@ -8,7 +8,7 @@ CREATE TABLE "users" (
 );
 
 CREATE TABLE "standard_questions" (
-  "id" uuid PRIMARY KEY,
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "initials" varchar NOT NULL,
   "question_text" text NOT NULL,
   "correct_answer" varchar NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE "standard_questions" (
 );
 
 CREATE TABLE "yes_no_questions" (
-  "id" uuid PRIMARY KEY,
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "question_text" text NOT NULL,
   "correct_answer" boolean NOT NULL,
   "category" varchar
