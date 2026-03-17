@@ -1,6 +1,6 @@
 CREATE TABLE "users" (
   "email" varchar PRIMARY KEY,
-  "username" varchar UNIQUE,
+  "username" varchar UNIQUE NOT NULL,
   "password_hash" varchar,
   "google_id" varchar,
   "elo_rating" int DEFAULT 1200,
@@ -8,7 +8,7 @@ CREATE TABLE "users" (
 );
 
 CREATE TABLE "standard_questions" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "id" SERIAL PRIMARY KEY,
   "initials" varchar NOT NULL,
   "question_text" text NOT NULL UNIQUE,
   "correct_answer" varchar NOT NULL,
@@ -17,14 +17,14 @@ CREATE TABLE "standard_questions" (
 );
 
 CREATE TABLE "yes_no_questions" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "id" SERIAL PRIMARY KEY,
   "question_text" text NOT NULL UNIQUE,
   "correct_answer" boolean NOT NULL,
   "category" varchar
 );
 
 CREATE TABLE "matches" (
-  "id" uuid PRIMARY KEY,
+  "id" BIGSERIAL PRIMARY KEY,
   "player1_id" varchar NOT NULL,
   "player2_id" varchar NOT NULL,
   "winner_id" varchar,
@@ -36,12 +36,12 @@ CREATE TABLE "matches" (
 );
 
 CREATE TABLE "match_turns" (
-  "id" uuid PRIMARY KEY,
-  "match_id" uuid NOT NULL,
+  "id" BIGSERIAL PRIMARY KEY,
+  "match_id" bigint NOT NULL,
   "player_id" varchar NOT NULL,
   "tile_id" int NOT NULL,
-  "standard_question_id" uuid,
-  "yes_no_question_id" uuid,
+  "standard_question_id" int,
+  "yes_no_question_id" int,
   "is_correct" boolean NOT NULL,
   "turn_timestamp" timestamp DEFAULT (now())
 );
@@ -68,16 +68,26 @@ COMMENT ON COLUMN "match_turns"."standard_question_id" IS 'Null if a Yes/No ques
 
 COMMENT ON COLUMN "match_turns"."yes_no_question_id" IS 'Null if a standard question was used';
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("player1_id") REFERENCES "users" ("email") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "matches" ADD FOREIGN KEY ("player1_id") REFERENCES "users" ("email");
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("player2_id") REFERENCES "users" ("email") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "matches" ADD FOREIGN KEY ("player2_id") REFERENCES "users" ("email");
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("winner_id") REFERENCES "users" ("email") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "matches" ADD FOREIGN KEY ("winner_id") REFERENCES "users" ("email");
 
-ALTER TABLE "match_turns" ADD FOREIGN KEY ("match_id") REFERENCES "matches" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "match_turns" ADD FOREIGN KEY ("match_id") REFERENCES "matches" ("id");
 
-ALTER TABLE "match_turns" ADD FOREIGN KEY ("player_id") REFERENCES "users" ("email") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "match_turns" ADD FOREIGN KEY ("player_id") REFERENCES "users" ("email");
 
-ALTER TABLE "match_turns" ADD FOREIGN KEY ("standard_question_id") REFERENCES "standard_questions" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "match_turns" ADD FOREIGN KEY ("standard_question_id") REFERENCES "standard_questions" ("id");
 
-ALTER TABLE "match_turns" ADD FOREIGN KEY ("yes_no_question_id") REFERENCES "yes_no_questions" ("id") DEFERRABLE INITIALLY IMMEDIATE;
+ALTER TABLE "match_turns" ADD FOREIGN KEY ("yes_no_question_id") REFERENCES "yes_no_questions" ("id");
+
+ALTER TABLE match_turns ADD CONSTRAINT check_one_question_type
+CHECK (
+  (standard_question_id IS NOT NULL AND yes_no_question_id IS NULL)
+  OR
+  (standard_question_id IS NULL AND yes_no_question_id IS NOT NULL)
+);
+
+ALTER TABLE matches ADD CONSTRAINT check_status
+CHECK (status IN ('ongoing', 'completed', 'aborted'));
