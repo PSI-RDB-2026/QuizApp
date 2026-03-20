@@ -59,3 +59,25 @@ def get_user_info(
         "email": user["email"],
         "username": user["username"]
     })
+
+
+@router.delete("/user")
+def delete_user(
+    auth: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Endpoint for delete user"""
+    try:
+        user = UserServices.get_user_from_token(token=auth.credentials)
+        if user is None:
+            result = {
+                "error": "user_not_found",
+                "message": "User not found."
+            }
+            return JSONResponse(status_code=404, content=result)
+        UserServices.delete_user(user["username"])
+    except HTTPException:
+        result = {
+            "error": "user_not_found",
+            "message": "User not found."
+        }
+        return JSONResponse(status_code=404, content=result)

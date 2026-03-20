@@ -4,6 +4,7 @@ import os
 from models.UserModels import RegisterRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
+from fastapi import HTTPException
 
 ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
@@ -79,9 +80,12 @@ class UserServices:
     def get_user_from_token(token: str):
         """Function for getting code from user token (JWT)"""
         decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        print(decoded)
         user_name = decoded["sub"]
-        return UserServices.USERS[user_name]
+        try:
+            user = UserServices.USERS[user_name]
+        except Exception:
+            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
+        return user if user else None
 
     @staticmethod
     def create_user(user: RegisterRequest) -> dict:
@@ -95,3 +99,11 @@ class UserServices:
 
         UserServices.USERS[user.username] = new_user
         return UserServices.USERS[user.username]
+
+    @staticmethod
+    def delete_user(user_name: str):
+        """Function for delete user"""
+        if user_name in UserServices.USERS:
+            UserServices.USERS.pop(user_name)
+        else:
+            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
