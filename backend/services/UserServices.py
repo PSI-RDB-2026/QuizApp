@@ -10,11 +10,13 @@ JWT_EXPIRE_MINUTES = 60
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in os.sys.path:
     os.sys.path.append(current_dir)
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")  # In a real application, use a secure key and store it safely
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")
+# In a real application, use a secure key and store it safely
 
 password_hasher = PasswordHasher()
 
-class userServices:
+
+class UserServices:
     '''
     This is a simple in-memory user service. In a real application, 
     you would likely use a database.
@@ -29,6 +31,7 @@ class userServices:
 
     @staticmethod
     def verify_password(hashed_password: str, plain_password: str) -> bool:
+        """Function for verifying users"""
         try:
             return password_hasher.verify(hashed_password, plain_password)
         except VerificationError:
@@ -39,10 +42,10 @@ class userServices:
     @staticmethod
     def authenticate_user(username: str, password: str) -> bool:
         '''Authenticate the user by checking the username and password.'''
-        user = userServices.USERS.get(username)
+        user = UserServices.USERS.get(username)
         if not user:
             return False
-        if not userServices.verify_password(user["password"], password):
+        if not UserServices.verify_password(user["password"], password):
             return False
         return True
 
@@ -50,9 +53,9 @@ class userServices:
     def get_user(username: str):
         '''Get user details by username.
         Returns None if the user does not exist.'''
-        if username not in userServices.USERS:
+        if username not in UserServices.USERS:
             return None
-        return userServices.USERS.get(username)
+        return UserServices.USERS.get(username)
 
     @staticmethod
     def create_access_token(data: dict,
@@ -78,7 +81,7 @@ class userServices:
         decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         print(decoded)
         user_name = decoded["sub"]
-        return userServices.USERS[user_name]
+        return UserServices.USERS[user_name]
 
     @staticmethod
     def create_user(user: RegisterRequest) -> dict:
@@ -90,6 +93,5 @@ class userServices:
         }
         print(new_user)
 
-        userServices.USERS[user.username] = new_user
-        return userServices.USERS[user.username]
-
+        UserServices.USERS[user.username] = new_user
+        return UserServices.USERS[user.username]
