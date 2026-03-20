@@ -54,6 +54,12 @@ class userServices:
 
         to_encode.update({"exp": expire})
 
-        print(str(to_encode), SECRET_KEY, ALGORITHM)  # Debugging output
+        # print(str(to_encode), SECRET_KEY, ALGORITHM)  # Debugging output
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
+
+    @staticmethod
+    def get_user_from_token(token: str):
+        """Function for getting code from user token (JWT)"""
+        decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        return userServices.USERS["test_user"]
