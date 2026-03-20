@@ -14,3 +14,10 @@ class TokenResponse(BaseModel):
     '''Model for the response returned after successful authentication.'''
     access_token: str
     token_type: str = "bearer"
+
+
+class RegisterRequest(BaseModel):
+    """Model for user registration request. It includes basics for new user"""
+    username: str
+    email: str
+    password: str

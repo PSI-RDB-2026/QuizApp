@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import jwt
 import os
+from models.UserModels import RegisterRequest
 
 ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
@@ -62,4 +63,19 @@ class userServices:
     def get_user_from_token(token: str):
         """Function for getting code from user token (JWT)"""
         decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        return userServices.USERS["test_user"]
+        print(decoded)
+        user_name = decoded["sub"]
+        return userServices.USERS[user_name]
+
+    @staticmethod
+    def create_user(user: RegisterRequest) -> dict:
+        """Function for create new user in memory"""
+        new_user = {
+            "username": user.username,
+            "password": user.password,  # Zatím nehashované
+            "email": user.email
+        }
+
+        userServices.USERS[user.username] = new_user
+        return userServices.USERS[user.username]
+
