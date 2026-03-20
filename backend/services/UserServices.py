@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 import jwt
 import os
 from models.UserModels import RegisterRequest
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError
 
 ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
@@ -9,6 +11,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in os.sys.path:
     os.sys.path.append(current_dir)
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")  # In a real application, use a secure key and store it safely
+
+password_hasher = PasswordHasher()
 
 class userServices:
     '''
@@ -18,10 +22,19 @@ class userServices:
     USERS = {
         "test_user": {
             "username": "test_user",
-            "password": "moje_heslo_123",  # Zatím nehashované
+            "password": password_hasher.hash("moje_heslo_123"),  # Zatím nehashované
             "email": "test@example.com"
         }
     }
+
+    @staticmethod
+    def verify_password(hashed_password: str, plain_password: str) -> bool:
+        try:
+            return password_hasher.verify(hashed_password, plain_password)
+        except VerificationError:
+            return False
+        except Exception:
+            return False
 
     @staticmethod
     def authenticate_user(username: str, password: str) -> bool:
@@ -29,7 +42,7 @@ class userServices:
         user = userServices.USERS.get(username)
         if not user:
             return False
-        if user["password"] != password:
+        if not userServices.verify_password(user["password"], password):
             return False
         return True
 
@@ -72,9 +85,10 @@ class userServices:
         """Function for create new user in memory"""
         new_user = {
             "username": user.username,
-            "password": user.password,  # Zatím nehashované
+            "password": password_hasher.hash(user.password),
             "email": user.email
         }
+        print(new_user)
 
         userServices.USERS[user.username] = new_user
         return userServices.USERS[user.username]

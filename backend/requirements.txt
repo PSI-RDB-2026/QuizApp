@@ -2,4 +2,5 @@ fastapi
 uvicorn
 pydantic
 PyJWT
-bcrypt
+argon2-cffi
+passlib
