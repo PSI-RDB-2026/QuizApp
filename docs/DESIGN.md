@@ -41,7 +41,7 @@ flowchart LR
 
 ## Data Model
 
-TODO(@MichalPKN) - dodat databázové schéma here
+![database diagram](..\diagrams\DB-diagram.png)
 
 TODO(@všichni) - Budeme sem dávat i class diagram?
 
