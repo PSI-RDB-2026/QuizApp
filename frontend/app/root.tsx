@@ -9,19 +9,14 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Wrapper } from "./Wrapper";
+import { Provider } from "./components/ui/provider";
+import { ChakraProvider, defaultSystem, defineConfig } from "@chakra-ui/react";
+//import { LucideProvider } from "lucide-react";
 
-export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-];
+const config = defineConfig({
+  // TODO: Create green color pallete for green dark and light mode
+});
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,16 +28,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
-        <ScrollRestoration />
-        <Scripts />
+        <Provider>
+          <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+          <ScrollRestoration />
+          <Scripts />
+        </Provider>
       </body>
     </html>
   );
 }
 
 export default function App() {
-  return <Outlet />;
+  return <Wrapper />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
