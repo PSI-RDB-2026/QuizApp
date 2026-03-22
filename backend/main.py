@@ -4,8 +4,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 import os
 import uvicorn
+import os
+import routers.Users as UsersRouter
 
 app = FastAPI()
+
+app.include_router(UsersRouter.router)
 
 app.add_middleware(
     CORSMiddleware,
