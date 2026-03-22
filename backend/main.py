@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import os
+import routers.Users as UsersRouter
 
 import routers.questions as QuestionsRouter
 import routers.health as HealthRouter
@@ -30,6 +32,8 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(HealthRouter.router)
 app.include_router(QuestionsRouter.router)
+app.include_router(UsersRouter.router)
+
 app.include_router(UsersRouter.router)
 
 app.add_middleware(
