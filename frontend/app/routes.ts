@@ -1,3 +1,11 @@
 import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
-export default [route("/", "routes/Main.tsx")] satisfies RouteConfig;
+export default [
+  index("routes/MainMenu.tsx"),
+  route("pyramidGameMenu", "./routes/PyramidGameMenu.tsx"),
+  route("pyramidGameMenu/localGame", "./routes/PyramidLocaGame.tsx"),
+  route(
+    "pyramidGameMenu/multiplayerGame",
+    "./routes/PyramidMultiplayerGame.tsx",
+  ),
+] satisfies RouteConfig;

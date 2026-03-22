@@ -1,8 +1,6 @@
-import type { Route } from "./+types/Main";
-import Welcome from "../welcome/welcome";
+import type { Route } from "./+types/MainMenu";
 import axios from "axios";
 import { useState, useEffect } from "react";
-import React from "react";
 import { GameModeCard } from "components/GameModeCard";
 import { Container, Flex } from "@chakra-ui/react";
 
@@ -13,7 +11,7 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Main() {
+export default function MainMenu() {
   const [hello, setHello] = useState({ message: "Loading..." });
 
   useEffect(() => {
@@ -35,12 +33,12 @@ export default function Main() {
   }, []);
 
   return (
-    <Container maxW="container.lg" className="py-8">
-      <Flex justifyContent={"center"} padding={25}>
+    <Container maxW="container.lg" padding={25}>
+      <Flex justifyContent={"center"}>
         <GameModeCard
-          title="AZ Kvíz"
+          title="AZ Pyramida"
           description="Conquer the pyramid of letters."
-          onClick={() => console.log("Single Player clicked")}
+          navigateTo={"/pyramidGameMenu"}
           color="bg-primary"
         />
       </Flex>

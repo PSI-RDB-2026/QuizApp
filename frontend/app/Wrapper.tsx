@@ -11,7 +11,6 @@ export const Wrapper: FC<Props> = (props) => {
     <div>
       <Header />
       <Outlet />
-      <Footer />
     </div>
   );
 };
