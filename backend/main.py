@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-import backend.routers.questions as QuestionsRouter
+import routers.questions as QuestionsRouter
 import routers.health as HealthRouter
 import routers.Users as UsersRouter
 from db.database import close_db, init_db

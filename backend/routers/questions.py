@@ -32,8 +32,8 @@ async def get_random_question():
 async def get_random_yesno_question():
     question = await fetch_one(
         """
-        SELECT id, question_text, correct_answer, category, difficulty
-        FROM yesno_questions
+        SELECT id, question_text, correct_answer, category
+        FROM yes_no_questions
         ORDER BY RANDOM()
         LIMIT 1
         """
@@ -47,5 +47,4 @@ async def get_random_yesno_question():
         "question_text": question_map["question_text"],
         "answer": question_map["correct_answer"],
         "category": question_map["category"],
-        "difficulty": question_map["difficulty"],
     }
