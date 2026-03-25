@@ -12,11 +12,18 @@ from db.database import close_db, init_db
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await init_db()
+    db_initialized = False
+    try:
+        await init_db()
+        db_initialized = True
+    except Exception as error:
+        # Allow app startup while DB is not ready; mock services can still run.
+        print(f"Database initialization skipped: {error}")
     try:
         yield
     finally:
-        await close_db()
+        if db_initialized:
+            await close_db()
 
 
 app = FastAPI()

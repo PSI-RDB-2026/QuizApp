@@ -1,42 +1,47 @@
 from fastapi import APIRouter, HTTPException
+from typing import Literal
 
-from db.database import fetch_one
+from models.QuestionModels import (
+    CheckQuestionRequest,
+    CheckQuestionResponse,
+    GetQuestionResponse,
+)
+from services.QuestionsService import QuestionsService
 
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/questions", tags=["questions"])
 
 
-@router.get("/questions/standard/random")
-async def get_random_question():
-    question = await fetch_one(
-        """
-        SELECT id, question_text, correct_answer, category, difficulty
-        FROM standard_questions
-        ORDER BY RANDOM()
-        LIMIT 1
-        """
-    )
-    if not question:
+@router.get("", response_model=GetQuestionResponse)
+def get_question(
+    question: str | None = None,
+    question_type: Literal["standard", "yes_no"] | None = None,
+) -> GetQuestionResponse:
+    """Returns one question.
+
+    Query parameter `question` is currently optional/unused and reserved for
+    future filtering logic.
+    """
+    question_item = QuestionsService.get_question(question, question_type)
+    if not question_item:
         raise HTTPException(status_code=404, detail="No questions found")
 
-    question_map = question._mapping
-    return {
-        "id": question_map["id"],
-        "question_text": question_map["question_text"],
-        "answer": question_map["correct_answer"],
-        "category": question_map["category"],
-        "difficulty": question_map["difficulty"],
-    }
+    return GetQuestionResponse(
+        id=question_item["id"],
+        question_type=question_item["question_type"],
+        question_text=question_item["question_text"],
+        category=question_item.get("category"),
+        difficulty=question_item.get("difficulty"),
+    )
 
-@router.get("/questions/yesno/random")
-async def get_random_yesno_question():
-    question = await fetch_one(
-        """
-        SELECT id, question_text, correct_answer, category
-        FROM yes_no_questions
-        ORDER BY RANDOM()
-        LIMIT 1
-        """
+
+@router.post("/check", response_model=CheckQuestionResponse)
+def check_question(payload: CheckQuestionRequest) -> CheckQuestionResponse:
+    """Checks whether a submitted answer is correct for the given question id."""
+    result = QuestionsService.check_question(
+        question_id=payload.question_id,
+        answer=payload.answer,
+        question_type=payload.question_type,
     )
     if not question:
         raise HTTPException(status_code=404, detail="No questions found")
