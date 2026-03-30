@@ -23,12 +23,15 @@ import { LoginForm } from "./LoginForm";
 import { useColorModeValue } from "app/components/ui/color-mode";
 
 type Props = {};
+type LoginActions = "login" | "register" | null;
 
 export const ModalForm: FC<Props> = (props) => {
   const [showLogin, setShowLogin] = useState<boolean>(true);
   const buttonShadowBg = useColorModeValue("gray.200", "black");
+  const [Action, setLoginAction] = useState<LoginActions>(null);
+  const [openForm, setOpenForm] = useState(false);
   return (
-    <Dialog.Root>
+    <Dialog.Root open={openForm} onOpenChange={(e) => setOpenForm(e.open)}>
       <Dialog.Trigger asChild>
         <Button variant="outline" rounded={"full"} colorPalette={"green"}>
           <Icon as={LuLogIn} size={"sm"} />
@@ -72,7 +75,7 @@ export const ModalForm: FC<Props> = (props) => {
                 </Button>
               </Flex>
             </Box>
-            {showLogin ? <LoginForm /> : <RegisterForm />}
+            {showLogin ? <LoginForm setOpen={setOpenForm} /> : <RegisterForm setOpen={setOpenForm} />}
           </Dialog.Content>
         </Dialog.Positioner>
       </Portal>
