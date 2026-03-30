@@ -11,18 +11,34 @@ import { useColorModeValue } from "app/components/ui/color-mode";
 import type { FC } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleIcon } from "./General/CustomIcons";
+import { useAuth } from "app/providers/AuthProvider";
+import { getLogin } from "api/api";
 
-interface Props {}
+interface Props {
+  setOpen: (open: boolean) => void;
+}
 
 interface FormValues {
   username: string;
   password: string;
 }
-export const LoginForm: FC<Props> = (props) => {
+
+export const LoginForm: FC<Props> = ({ setOpen }) => {
   const { register, handleSubmit } = useForm<FormValues>();
+  const { login } = useAuth();
   const buttonBg = useColorModeValue("green.400", "green.600");
-  const onSubmit = handleSubmit((data: FormValues) => {
-    console.log(data);
+
+  const onSubmit = handleSubmit(async (data: FormValues) => {
+    try {
+      const response = await getLogin(data);
+      if (response.data?.access_token) {
+        // Store token and update auth context
+        login(response.data.access_token);
+        setOpen(false);
+      }
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
   });
 
   return (

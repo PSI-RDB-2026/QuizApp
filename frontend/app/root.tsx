@@ -18,6 +18,7 @@ import {
   defaultSystem,
   defineConfig,
 } from "@chakra-ui/react";
+import { AuthProvider } from "./providers/AuthProvider";
 //import { LucideProvider } from "lucide-react";
 
 const config = defineConfig({
@@ -66,7 +67,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <Provider>
-          <ChakraProvider value={customSystem}>{children}</ChakraProvider>
+          <ChakraProvider value={customSystem}>
+            <AuthProvider>{children}</AuthProvider>
+          </ChakraProvider>
           <ScrollRestoration />
           <Scripts />
         </Provider>

@@ -13,20 +13,38 @@ import type { FC } from "react";
 import { GoogleIcon } from "./General/CustomIcons";
 import { useForm, type UseFormRegister } from "react-hook-form";
 import { useColorModeValue } from "app/components/ui/color-mode";
+import { postRegister } from "api/api";
+import { useAuth } from "app/providers/AuthProvider";
 
-interface Props {}
+interface Props {
+  setOpen: (open: boolean) => void;
+}
 interface FormValues {
   username: string;
   email: string;
   password: string;
   confirmPassword: string;
 }
-export const RegisterForm: FC<Props> = () => {
+export const RegisterForm: FC<Props> = ({ setOpen }) => {
   const { register, handleSubmit } = useForm<FormValues>();
   const buttonBg = useColorModeValue("green.500", "green.600");
+  const { login } = useAuth();
 
-  const onSubmit = handleSubmit((data: FormValues) => {
-    console.log(data);
+  const onSubmit = handleSubmit(async (data: FormValues) => {
+    if (data.password !== data.confirmPassword) {
+      console.error("Passwords do not match");
+      return;
+    }
+    try {
+      const response = await postRegister(data);
+      if (response.data?.access_token) {
+        // Store token and update auth context
+        login(response.data.access_token);
+        setOpen(false);
+      }
+    } catch (error) {
+      console.error("Registration failed:", error);
+    }
   });
   return (
     <Dialog.Body>
