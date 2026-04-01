@@ -6,3 +6,8 @@ argon2-cffi
 passlib
 SQLAlchemy>=2.0
 asyncpg
+pytest
+pytest-asyncio
+httpx
+pytest-cov
+pytest-mock
