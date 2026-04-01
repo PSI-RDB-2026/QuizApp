@@ -15,15 +15,15 @@ async def login(credentials: LoginRequest, response: JSONResponse) -> TokenRespo
     '''Endpoint for user login.
     It authenticates the user and returns a JWT access token if successful.'''
     authenticated = await UserServices.authenticate_user(
-        credentials.username,
+        credentials.email,
         credentials.password
     )
     if not authenticated:
         raise HTTPException(
             status_code=401,
-            detail="Invalid username or password"
+            detail="Invalid email or password"
         )
-    user = await UserServices.get_user(credentials.username)
+    user = await UserServices.get_user(credentials.email)
     access_token = await UserServices.create_access_token(data={
         "sub": user["username"],
         "email": user["email"]

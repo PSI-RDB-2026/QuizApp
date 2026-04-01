@@ -133,7 +133,7 @@ class UserServices:
             """,
             {"username": user.username}
         )
-        user_from_db._mapping
+        user_from_db = user_from_db._mapping
         return {
             "username": user_from_db["username"],
             "email": user_from_db["email"]
