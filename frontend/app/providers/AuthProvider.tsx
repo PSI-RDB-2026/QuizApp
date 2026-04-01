@@ -17,7 +17,7 @@ interface AuthContextType {
 }
 const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const userInit = JSON.parse(localStorage.getItem("user") ?? "");
+  const userInit = JSON.parse(localStorage.getItem("user") || "{}") || {};
   const [user, setUser] = useState(userInit || null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); // AKA isLoggedIn
   // Simulate loading user data from local storage or an API on mount

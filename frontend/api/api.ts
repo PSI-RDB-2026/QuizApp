@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const apiUrl = "/api";
+const apiUrl = "http://localhost:8000";
 
 export const postRegister = async (userParams) => {
   const { username, email, password } = userParams;

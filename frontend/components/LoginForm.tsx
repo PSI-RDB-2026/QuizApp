@@ -24,7 +24,11 @@ interface FormValues {
 }
 
 export const LoginForm: FC<Props> = ({ setOpen }) => {
-  const { register, handleSubmit } = useForm<FormValues>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>();
   const { login } = useAuth();
   const buttonBg = useColorModeValue("green.400", "green.600");
 
@@ -32,8 +36,8 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
     try {
       const response = await getLogin(data);
       if (response.data?.access_token) {
-        // Store token and update auth context
-        login(response.data.access_token);
+        // Store user data, token and update auth context
+        login({ ...data, access_token: response.data.access_token });
         setOpen(false);
       }
     } catch (error) {
@@ -46,18 +50,26 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
       <form onSubmit={onSubmit}>
         <Field.Root id={"username"}>
           <Field.Label>Username</Field.Label>
-          <Input {...register("username")} placeholder="Enter your username" />
-          <Field.ErrorText>Username is required</Field.ErrorText>
+          <Input
+            {...register("username", { required: "Username is required" })}
+            placeholder="Enter your username"
+          />
+          <Field.ErrorText width={"full"}>
+            <Field.ErrorIcon />
+            {errors.username && errors.username.message}
+          </Field.ErrorText>
         </Field.Root>
 
         <Field.Root id={"password"} marginTop={4}>
           <Field.Label>Password</Field.Label>
           <Input
-            {...register("password")}
+            {...register("password", { required: "Password is required" })}
             type="password"
             placeholder="Enter your password"
           />
-          <Field.ErrorText>Password is required</Field.ErrorText>
+          <Field.ErrorText>
+            {errors.password && errors.password.message}
+          </Field.ErrorText>
         </Field.Root>
 
         <HStack marginTop={6} marginBottom={3}>

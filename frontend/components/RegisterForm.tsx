@@ -31,15 +31,26 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
   const { login } = useAuth();
 
   const onSubmit = handleSubmit(async (data: FormValues) => {
+    console.log("Form data:", data);
     if (data.password !== data.confirmPassword) {
       console.error("Passwords do not match");
       return;
     }
+    const registerInfo = {
+      username: data.username,
+      email: data.email,
+      password: data.password,
+    };
     try {
-      const response = await postRegister(data);
+      const response = await postRegister(registerInfo);
       if (response.data?.access_token) {
         // Store token and update auth context
-        login(response.data.access_token);
+        const user = {
+          username: data.username,
+          email: data.email,
+          access_token: response.data.access_token,
+        };
+        login(user);
         setOpen(false);
       }
     } catch (error) {
