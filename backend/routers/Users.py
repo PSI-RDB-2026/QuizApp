@@ -3,21 +3,28 @@ from fastapi.responses import JSONResponse
 from services.UserServices import UserServices
 from models.UserModels import LoginRequest, TokenResponse, RegisterRequest
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from db.database import execute, fetch_one, fetch_all
 
-router = APIRouter(prefix="/users")
+router = APIRouter(prefix="/api/users", tags=["users"])
 
 security = HTTPBearer()
 
 
 @router.post("/login")
-def login(credentials: LoginRequest, response: JSONResponse) -> TokenResponse:
-    '''Endpoint for user login. 
+async def login(credentials: LoginRequest, response: JSONResponse) -> TokenResponse:
+    '''Endpoint for user login.
     It authenticates the user and returns a JWT access token if successful.'''
-    authenticated = UserServices.authenticate_user(credentials.username, credentials.password)
+    authenticated = await UserServices.authenticate_user(
+        credentials.username,
+        credentials.password
+    )
     if not authenticated:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    user = UserServices.get_user(credentials.username)
-    access_token = UserServices.create_access_token(data={
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+    user = await UserServices.get_user(credentials.username)
+    access_token = await UserServices.create_access_token(data={
         "sub": user["username"],
         "email": user["email"]
     })
@@ -26,10 +33,10 @@ def login(credentials: LoginRequest, response: JSONResponse) -> TokenResponse:
 
 
 @router.post("/register")
-def register_user(credentials: RegisterRequest) -> TokenResponse:
+async def register_user(credentials: RegisterRequest) -> TokenResponse:
     """Endpoint for registr new user"""
-    user = UserServices.create_user(credentials)
-    token = UserServices.create_access_token(data={
+    user = await UserServices.create_user(credentials)
+    token = await UserServices.create_access_token(data={
         "sub": user["username"],
         "email": user["email"]
     })
@@ -37,12 +44,12 @@ def register_user(credentials: RegisterRequest) -> TokenResponse:
 
 
 @router.post("/token-renew")
-def token_renew(
+async def token_renew(
     auth: HTTPAuthorizationCredentials = Depends(security)
 ) -> TokenResponse:
     """Function for renew user token"""
-    user = UserServices.get_user_from_token(token=auth.credentials)
-    new_token = UserServices.create_access_token(data={
+    user = await UserServices.get_user_from_token(token=auth.credentials)
+    new_token = await UserServices.create_access_token(data={
         "sub": user["username"],
         "email": user["email"]
     })
@@ -50,11 +57,11 @@ def token_renew(
 
 
 @router.get("/info")
-def get_user_info(
+async def get_user_info(
     auth: HTTPAuthorizationCredentials = Depends(security)
 ) -> JSONResponse:
     """Endpoint for get authenticated user info"""
-    user = UserServices.get_user_from_token(token=auth.credentials)
+    user = await UserServices.get_user_from_token(token=auth.credentials)
     return JSONResponse(content={
         "email": user["email"],
         "username": user["username"]
@@ -62,19 +69,19 @@ def get_user_info(
 
 
 @router.delete("/user")
-def delete_user(
+async def delete_user(
     auth: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Endpoint for delete user"""
     try:
-        user = UserServices.get_user_from_token(token=auth.credentials)
+        user = await UserServices.get_user_from_token(token=auth.credentials)
         if user is None:
             result = {
                 "error": "user_not_found",
                 "message": "User not found."
             }
             return JSONResponse(status_code=404, content=result)
-        UserServices.delete_user(user["username"])
+        await UserServices.delete_user(user["username"])
     except HTTPException:
         result = {
             "error": "user_not_found",
