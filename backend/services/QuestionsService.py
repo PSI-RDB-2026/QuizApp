@@ -1,120 +1,84 @@
-"""Mock question service used before DB-backed implementation is available."""
-import random
 from typing import Literal
+from db.database import execute, fetch_one, fetch_all
 
 
 class QuestionsService:
-    """Provides in-memory question retrieval and answer validation."""
-
-    MOCK_STANDARD_QUESTIONS = [
-        {
-            "id": 1,
-            "question_text": "What does HTTP stand for?",
-            "correct_answer": "HyperText Transfer Protocol",
-            "category": "IT",
-            "difficulty": 1,
-        },
-        {
-            "id": 2,
-            "question_text": "Which planet is known as the Red Planet?",
-            "correct_answer": "Mars",
-            "category": "Science",
-            "difficulty": 1,
-        },
-        {
-            "id": 3,
-            "question_text": "Who wrote Romeo and Juliet?",
-            "correct_answer": "William Shakespeare",
-            "category": "Literature",
-            "difficulty": 2,
-        },
-    ]
-
-    MOCK_YES_NO_QUESTIONS = [
-        {
-            "id": 1001,
-            "question_text": "The Earth revolves around the Sun.",
-            "correct_answer": "yes",
-            "category": "Science",
-        },
-        {
-            "id": 1002,
-            "question_text": "Python is a compiled-only language.",
-            "correct_answer": "no",
-            "category": "IT",
-        },
-        {
-            "id": 1003,
-            "question_text": "Prague is the capital city of the Czech Republic.",
-            "correct_answer": "yes",
-            "category": "Geography",
-        },
-    ]
-
+    """Provides question-related operations"""
+    
     @staticmethod
-    def get_question(
-        _: str | None = None,
-        question_type: Literal["standard", "yes_no"] | None = None,
-    ) -> dict | None:
-        """Returns one mock question.
-
-        The optional string parameter is intentionally unused for now and is
-        reserved for future filtering/search logic.
-        """
+    async def get_rand_question(
+        question_type: Literal["standard", "yes_no"] = "standard",
+        ) -> dict | None:
+        """Returns one random question, filtered by type."""
+        
         if question_type == "standard":
-            if not QuestionsService.MOCK_STANDARD_QUESTIONS:
-                return None
-
-            selected = random.choice(QuestionsService.MOCK_STANDARD_QUESTIONS)
-            return {**selected, "question_type": "standard"}
-
-        if question_type == "yes_no":
-            if not QuestionsService.MOCK_YES_NO_QUESTIONS:
-                return None
-
-            selected = random.choice(QuestionsService.MOCK_YES_NO_QUESTIONS)
-            return {**selected, "question_type": "yes_no"}
-
-        merged_questions = [
-            *[{**question, "question_type": "standard"} for question in QuestionsService.MOCK_STANDARD_QUESTIONS],
-            *[{**question, "question_type": "yes_no"} for question in QuestionsService.MOCK_YES_NO_QUESTIONS],
-        ]
-        if not merged_questions:
-            return None
-
-        return random.choice(merged_questions)
-
-    @staticmethod
-    def check_question(
-        question_id: int,
-        answer: str,
-        question_type: Literal["standard", "yes_no"] | None = None,
-    ) -> tuple[bool, str] | None:
-        """Validates answer for a question id and returns correctness + expected answer."""
-        if question_type == "standard":
-            question = next(
-                (item for item in QuestionsService.MOCK_STANDARD_QUESTIONS if item["id"] == question_id),
-                None,
+            question = await fetch_one(
+                """
+                SELECT id, question_text, initials, correct_answer, category, difficulty
+                FROM standard_questions
+                ORDER BY RANDOM()
+                LIMIT 1
+                """
             )
         elif question_type == "yes_no":
-            question = next(
-                (item for item in QuestionsService.MOCK_YES_NO_QUESTIONS if item["id"] == question_id),
-                None,
+            question = await fetch_one(
+                """
+                SELECT id, question_text, correct_answer, category
+                FROM yes_no_questions
+                ORDER BY RANDOM()
+                LIMIT 1
+                """
             )
-        else:
-            question = next(
-                (item for item in QuestionsService.MOCK_STANDARD_QUESTIONS if item["id"] == question_id),
-                None,
-            )
-            if question is None:
-                question = next(
-                    (item for item in QuestionsService.MOCK_YES_NO_QUESTIONS if item["id"] == question_id),
-                    None,
-                )
-
-        if question is None:
+        
+        if not question:
             return None
+        
+        question_map = question._mapping
+        return dict(question_map, question_type=question_type)
 
-        correct_answer = question["correct_answer"]
-        is_correct = answer.strip().lower() == correct_answer.strip().lower()
+    @staticmethod
+    async def check_question(
+        question_id: int,
+        answer: str | bool,
+        question_type: Literal["standard", "yes_no"] = "standard",
+    ) -> tuple[bool, str] | None:
+        """
+        Validates answer for a question id and returns correctness + expected answer.
+        Answer is either a string (for standard questions) or a boolean (for yes/no questions).
+        """
+        
+        if question_type == "standard":
+            question = await fetch_one(
+                """
+                SELECT correct_answer
+                FROM standard_questions
+                WHERE id = :id
+                """,
+                {"id": question_id}
+            )
+            
+            if not question:
+                return None
+            
+            question = question._mapping
+            correct_answer = question._mapping["correct_answer"]
+            is_correct = answer.strip().lower() == correct_answer.strip().lower()
+            
+        elif question_type == "yes_no":
+            question = await fetch_one(
+                """
+                SELECT correct_answer
+                FROM yes_no_questions
+                WHERE id = :id
+                """,
+                {"id": question_id}
+            )
+            
+            if not question:
+                return None
+            
+            question = question._mapping
+            correct_answer = question["correct_answer"]
+            is_correct = answer == correct_answer # correct_answer is bool
+            
         return is_correct, correct_answer

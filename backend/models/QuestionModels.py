@@ -9,6 +9,7 @@ class GetQuestionResponse(BaseModel):
     id: int
     question_type: Literal["standard", "yes_no"]
     question_text: str
+    initials: str | None = None
     category: str | None = None
     difficulty: int | None = None
 
@@ -16,11 +17,11 @@ class GetQuestionResponse(BaseModel):
 class CheckQuestionRequest(BaseModel):
     """Request model for answer validation."""
     question_id: int
-    answer: str
+    answer: str | bool
     question_type: Literal["standard", "yes_no"] | None = None
 
 
 class CheckQuestionResponse(BaseModel):
     """Response model with validation result and the expected answer."""
     is_correct: bool
-    correct_answer: str
+    correct_answer: str | bool
