@@ -16,10 +16,7 @@ router = APIRouter(prefix="/api/questions", tags=["questions"])
 async def get_question(
     question_type: Literal["standard", "yes_no"] = "standard",
 ) -> GetQuestionResponse:
-    """Returns one question.
-
-    The response includes one random question filtered by `question_type`.
-    """
+    """Returns one random question, filtered by `question_type`."""
     question_item = await QuestionsService.get_rand_question(question_type)
     if not question_item:
         raise HTTPException(status_code=404, detail="No questions found")
@@ -36,7 +33,10 @@ async def get_question(
 
 @router.post("/check", response_model=CheckQuestionResponse)
 async def check_question(payload: CheckQuestionRequest) -> CheckQuestionResponse:
-    """Checks whether a submitted answer is correct for the given question id."""
+    """
+    Checks whether a submitted answer is correct for the given question id.
+    answer is either a string (for standard questions) or a boolean (for yes/no questions).
+    """
     result = await QuestionsService.check_question(
         question_id=payload.question_id,
         answer=payload.answer,
