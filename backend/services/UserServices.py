@@ -94,15 +94,15 @@ class UserServices:
     async def get_user_from_token(token: str):
         """Function for getting code from user token (JWT)"""
         decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        user_name = decoded["sub"]
+        email = decoded["email"]
         try:
             user = await fetch_one(
                 """
                 SELECT username, email
                 FROM users
-                WHERE username = :username
+                WHERE email = :email
                 """,
-                {"username": user_name}
+                {"email": email}
             )
             print(user)
         except Exception as e:

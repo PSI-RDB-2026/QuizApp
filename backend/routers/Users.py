@@ -50,8 +50,8 @@ async def token_renew(
     """Function for renew user token"""
     user = await UserServices.get_user_from_token(token=auth.credentials)
     new_token = await UserServices.create_access_token(data={
-        "sub": user["username"],
-        "email": user["email"]
+        "sub": user[0],
+        "email": user[1]
     })
     return TokenResponse(access_token=new_token)
 
@@ -62,9 +62,10 @@ async def get_user_info(
 ) -> JSONResponse:
     """Endpoint for get authenticated user info"""
     user = await UserServices.get_user_from_token(token=auth.credentials)
+    print(user)  # Debugging output
     return JSONResponse(content={
-        "email": user["email"],
-        "username": user["username"]
+        "email": user[1],
+        "username": user[0]
     })
 
 
@@ -81,7 +82,7 @@ async def delete_user(
                 "message": "User not found."
             }
             return JSONResponse(status_code=404, content=result)
-        await UserServices.delete_user(user["username"])
+        await UserServices.delete_user(user[0])
     except HTTPException:
         result = {
             "error": "user_not_found",
