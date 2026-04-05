@@ -5,6 +5,7 @@ from models.UserModels import RegisterRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from fastapi import HTTPException
+from db.database import execute, fetch_one, fetch_all
 
 ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
@@ -12,7 +13,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in os.sys.path:
     os.sys.path.append(current_dir)
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")
-# In a real application, use a secure key and store it safely
 
 password_hasher = PasswordHasher()
 
@@ -25,7 +25,7 @@ class UserServices:
     USERS = {
         "test_user": {
             "username": "test_user",
-            "password": password_hasher.hash("moje_heslo_123"),  # Zatím nehashované
+            "password": password_hasher.hash("moje_heslo_123"),
             "email": "test@example.com"
         }
     }
@@ -41,9 +41,9 @@ class UserServices:
             return False
 
     @staticmethod
-    def authenticate_user(username: str, password: str) -> bool:
-        '''Authenticate the user by checking the username and password.'''
-        user = UserServices.USERS.get(username)
+    async def authenticate_user(email: str, password: str) -> bool:
+        '''Authenticate the user by checking the email and password.'''
+        user = await UserServices.get_user(email)
         if not user:
             return False
         if not UserServices.verify_password(user["password"], password):
@@ -51,17 +51,31 @@ class UserServices:
         return True
 
     @staticmethod
-    def get_user(username: str):
-        '''Get user details by username.
+    async def get_user(email: str):
+        '''Get user details by email.
         Returns None if the user does not exist.'''
-        if username not in UserServices.USERS:
-            return None
-        return UserServices.USERS.get(username)
+        try:
+            user = await fetch_one(
+                """
+                SELECT username, password_hash AS password, email
+                FROM users
+                WHERE email = :email
+                """,
+                {"email": email}
+            )
+            print(user)
+            return user._mapping
+        except Exception as e:
+            print(f"Error occurred while fetching user: {e}")
+            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
+        return None
 
     @staticmethod
-    def create_access_token(data: dict,
-                            expires_delta: timedelta | None = None) -> str:
-        '''Create a JWT access token with 
+    async def create_access_token(
+        data: dict,
+        expires_delta: timedelta | None = None
+    ) -> str:
+        '''Create a JWT access token with
         the given data and expiration time.'''
         to_encode = data.copy()
 
@@ -77,18 +91,27 @@ class UserServices:
         return encoded_jwt
 
     @staticmethod
-    def get_user_from_token(token: str):
+    async def get_user_from_token(token: str):
         """Function for getting code from user token (JWT)"""
         decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        user_name = decoded["sub"]
+        email = decoded["email"]
         try:
-            user = UserServices.USERS[user_name]
-        except Exception:
+            user = await fetch_one(
+                """
+                SELECT username, email
+                FROM users
+                WHERE email = :email
+                """,
+                {"email": email}
+            )
+            print(user)
+        except Exception as e:
+            print(f"Error occurred while fetching user from token: {e}")
             raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
         return user if user else None
 
     @staticmethod
-    def create_user(user: RegisterRequest) -> dict:
+    async def create_user(user: RegisterRequest) -> dict:
         """Function for create new user in memory"""
         new_user = {
             "username": user.username,
@@ -96,14 +119,35 @@ class UserServices:
             "email": user.email
         }
         print(new_user)
+        crete_user_query = """
+        INSERT INTO users (username, password_hash, email)
+        VALUES (:username, :password, :email)
+        """
+        await execute(crete_user_query, new_user)
 
-        UserServices.USERS[user.username] = new_user
-        return UserServices.USERS[user.username]
+        user_from_db = await fetch_one(
+            """
+            SELECT username, email
+            FROM users
+            WHERE username = :username
+            """,
+            {"username": user.username}
+        )
+        user_from_db = user_from_db._mapping
+        return {
+            "username": user_from_db["username"],
+            "email": user_from_db["email"]
+        }
 
     @staticmethod
-    def delete_user(user_name: str):
+    async def delete_user(user_name: str):
         """Function for delete user"""
-        if user_name in UserServices.USERS:
-            UserServices.USERS.pop(user_name)
-        else:
+        delete_user_query = """
+        DELETE FROM users
+        WHERE username = :username
+        """
+        try:
+            await execute(delete_user_query, {"username": user_name})
+        except Exception as e:
+            print(f"Error occurred while deleting user: {e}")
             raise HTTPException(status_code=404, detail="Uživatel nenalezen.")

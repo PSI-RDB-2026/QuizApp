@@ -5,8 +5,8 @@ from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    '''Model for user login request. It includes the username and password'''
-    username: str
+    '''Model for user login request. It includes the email and password'''
+    email: str
     password: str
 
 

@@ -1,7 +1,8 @@
-
+'''This module provides asynchronous database connection management
+and query execution
+'''
 import os
 from contextlib import asynccontextmanager
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -11,7 +12,7 @@ DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://quizapp:quizapp_pass@postgres:5432/quizapp",
 )
 
-pool = None
+POOL = None
 
 
 def _normalize_params(args: tuple):
@@ -19,47 +20,53 @@ def _normalize_params(args: tuple):
         return {}
     if len(args) == 1 and isinstance(args[0], dict):
         return args[0]
-    raise ValueError("Query parameters must be passed as a single dictionary argument.")
+    raise ValueError(
+        "Query parameters must be passed as a single dictionary argument.")
 
 
 async def init_db():
-    global pool
-    if pool is not None:
+    '''Initializes the database connection pool'''
+    global POOL
+    if POOL is not None:
         return
 
-    pool = create_async_engine(DATABASE_URL, echo=False)
+    POOL = create_async_engine(DATABASE_URL, echo=False)
 
     # Test connectivity
-    async with pool.connect() as conn:
+    async with POOL.connect() as conn:
         await conn.execute(text("SELECT 1"))
 
 
 async def close_db():
-    global pool
-    if pool is not None:
-        await pool.dispose()
-        pool = None
+    '''Closes the database connection pool'''
+    global POOL
+    if POOL is not None:
+        await POOL.dispose()
+        POOL = None
 
 
 @asynccontextmanager
 async def get_connection():
-    if pool is None:
+    '''Provides an asynchronous context manager for database connections'''
+    if POOL is None:
         await init_db()
 
-    async with pool.connect() as conn:
+    async with POOL.connect() as conn:
         yield conn
 
 
 async def execute(query: str, *args):
+    '''Executes a query with the provided parameters'''
     params = _normalize_params(args)
-    if pool is None:
+    if POOL is None:
         await init_db()
 
-    async with pool.begin() as conn:
+    async with POOL.begin() as conn:
         return await conn.execute(text(query), params)
 
 
 async def fetch_one(query: str, *args):
+    '''Fetches a single row from the database'''
     params = _normalize_params(args)
     async with get_connection() as conn:
         result = await conn.execute(text(query), params)
@@ -67,6 +74,7 @@ async def fetch_one(query: str, *args):
 
 
 async def fetch_all(query: str, *args):
+    '''Fetches all rows from the database'''
     params = _normalize_params(args)
     async with get_connection() as conn:
         result = await conn.execute(text(query), params)
