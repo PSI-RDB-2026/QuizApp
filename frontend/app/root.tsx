@@ -9,19 +9,51 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { Wrapper } from "./Wrapper";
+import { Provider } from "./components/ui/provider";
+import {
+  ChakraProvider,
+  createSystem,
+  defaultConfig,
+  defaultSystem,
+  defineConfig,
+} from "@chakra-ui/react";
+//import { LucideProvider } from "lucide-react";
 
-export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
+const config = defineConfig({
+  // TODO: Create green color pallete for green dark and light mode
+  theme: {
+    semanticTokens: {
+      colors: {
+        bg: {
+          DEFAULT: {
+            value: { _light: "{colors.white}", _dark: "#010804" }, // Custom dark background
+          },
+          subtle: {
+            value: { _light: "{colors.gray.50}", _dark: "#fbff00" }, // Custom dark subtle background
+          },
+          muted: {
+            value: { _light: "{colors.gray.100}", _dark: "#a3791d" }, // Custom dark muted background
+          },
+        },
+        fg: {
+          DEFAULT: {
+            value: { _light: "{colors.black}", _dark: "#ffffff" }, // Custom dark text color
+          },
+          muted: {
+            value: { _light: "{colors.gray.600}", _dark: "#ffffff" }, // Custom dark muted text
+          },
+        },
+        border: {
+          DEFAULT: {
+            value: { _light: "{colors.gray.200}", _dark: "#404040" }, // Custom dark border
+          },
+        },
+      },
+    },
   },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
-];
+});
+export const customSystem = createSystem(defaultConfig, config);
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -33,16 +65,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
-        <ScrollRestoration />
-        <Scripts />
+          <Provider>
+            <ChakraProvider value={customSystem}>{children}</ChakraProvider>
+            <ScrollRestoration />
+            <Scripts />
+          </Provider>
       </body>
     </html>
   );
 }
 
 export default function App() {
-  return <Outlet />;
+  return <Wrapper />;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

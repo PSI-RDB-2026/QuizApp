@@ -26,7 +26,7 @@ async def lifespan(_: FastAPI):
             await close_db()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.include_router(HealthRouter.router)
 app.include_router(QuestionsRouter.router)

@@ -42,8 +42,14 @@ async def check_question(payload: CheckQuestionRequest) -> CheckQuestionResponse
         answer=payload.answer,
         question_type=payload.question_type or "standard",
     )
-    if not result:
-        raise HTTPException(status_code=404, detail="Question not found")
+    if not question:
+        raise HTTPException(status_code=404, detail="No questions found")
 
-    is_correct, correct_answer = result
-    return CheckQuestionResponse(is_correct=is_correct, correct_answer=correct_answer)
+    question_map = question._mapping
+    return {
+        "id": question_map["id"],
+        "question_text": question_map["question_text"],
+        "answer": question_map["correct_answer"],
+        "category": question_map["category"],
+        "difficulty": question_map["difficulty"],
+    }
