@@ -115,7 +115,7 @@ flowchart LR
     DB[(Database)]
 
     Browser -->|HTTP: Login, Get Quiz| Backend
-    Backend -->|HTTP: Check Answer| DB
+    Browser -->|HTTP: Check Answer| Backend
     Browser -->|HTTP: Submit answers| Backend
 
     DB -->|Load Questions| Backend
@@ -148,6 +148,8 @@ flowchart LR
     P1 -->|HTTP: Submit answer| Backend
     Backend -->|Save| DB
     Backend -->|WebSocket: Score update| P2
+    P1 -->|HTTP: Check Answer| Backend
+    P2 -->|HTTP: Check Answer| Backend
 
     P2 -->|HTTP: Submit answer| Backend
     DB -->|Load Question| Backend
