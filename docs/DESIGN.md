@@ -41,9 +41,68 @@ flowchart LR
 
 ## Data Model
 
-![database diagram](..\diagrams\DB-diagram.png)
+```mermaid
+erDiagram
+    USERS {
+        varchar email PK
+        varchar username UK
+        varchar password_hash
+        varchar google_id
+        int elo_rating
+        timestamp created_at
+    }
 
-TODO(@všichni) - Budeme sem dávat i class diagram?
+    STANDARD_QUESTIONS {
+        int id PK
+        varchar initials
+        text question_text UK
+        varchar correct_answer
+        varchar category
+        int difficulty
+    }
+
+    YES_NO_QUESTIONS {
+        int id PK
+        text question_text UK
+        boolean correct_answer
+        varchar category
+    }
+
+    MATCHES {
+        bigint id PK
+        varchar player1_id FK
+        varchar player2_id FK
+        varchar winner_id FK
+        int player1_elo_change
+        int player2_elo_change
+        varchar status
+        timestamp started_at
+        timestamp finished_at
+    }
+
+    MATCH_TURNS {
+        bigint id PK
+        bigint match_id FK
+        varchar player_id FK
+        int tile_id
+        int standard_question_id FK
+        int yes_no_question_id FK
+        boolean is_correct
+        timestamp turn_timestamp
+    }
+
+    USERS ||--o{ MATCHES : plays_as_player1
+    USERS ||--o{ MATCHES : plays_as_player2
+    USERS o|--o{ MATCHES : wins
+    MATCHES ||--o{ MATCH_TURNS : has
+    USERS ||--o{ MATCH_TURNS : makes
+    STANDARD_QUESTIONS o|--o{ MATCH_TURNS : appears_in
+    YES_NO_QUESTIONS o|--o{ MATCH_TURNS : appears_in
+```
+
+Constraint: each turn references exactly one question type (`standard_question_id` xor `yes_no_question_id`).
+
+Original DB diagrama is in [/diagrams/DB-diagram.md](../diagrams/DB-diagram.png)
 
 ## Interaction Design
 
@@ -61,11 +120,11 @@ flowchart LR
 
     DB -->|Load Questions| Backend
 
-    Backend ~~~ DB    
-    
+    Backend ~~~ DB
+
     Backend -->|HTTP: Results| Browser
 
-    
+
 ```
 
 **Communication:** HTTP/REST only. Answers stored locally, submitted once.
