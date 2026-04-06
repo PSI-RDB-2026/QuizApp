@@ -32,7 +32,7 @@ export const Header: FC<Props> = (props) => {
         padding={15}
         shadow={"lg"}
       >
-        <h2>Logo</h2>
+        <h2>QuizzApp</h2>
         <Flex gap={"1rem"} alignItems="center">
           <ColorModeButton colorPalette={"green"} />
           {!isAuthenticated ? (

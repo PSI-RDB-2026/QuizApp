@@ -20,7 +20,6 @@ export const GameModeCard: FC<Props> = ({
   color,
 }) => {
   const descColor = useColorModeValue("gray.500", "gray.400");
-  const bg = useColorModeValue("white", "black");
   const navigate = useNavigate();
   return (
     <Button
@@ -35,6 +34,9 @@ export const GameModeCard: FC<Props> = ({
       display="flex"
       flexDirection="column"
       alignItems="center"
+      width={{ base: "100%", md: "48%" }}
+      maxWidth={{ base: "100%", md: "560px" }}
+      minHeight={{ base: "300px", md: "360px" }}
       height={"full"}
       borderRadius="3xl"
       boxShadow="xl"
@@ -43,16 +45,16 @@ export const GameModeCard: FC<Props> = ({
       borderTopColor={"green.500"}
       shadow={"lg"}
       cursor={"pointer"}
-      padding={50}
+      padding={{ base: 6, md: 10 }}
     >
       <Box
-        padding={25}
+        padding={{ base: 5, md: 6 }}
         className={`${color} group-hover:scale-110 transition-transform duration-300`}
         display="flex"
         alignItems="center"
         justifyContent="center"
         color="white"
-        m={25}
+        m={{ base: 4, md: 6 }}
         borderRadius="lg"
         shadow="inner"
       >
@@ -61,17 +63,18 @@ export const GameModeCard: FC<Props> = ({
 
       <Heading
         as="h2"
-        size="2xl"
+        size={{ base: "xl", md: "2xl" }}
         mb={3}
         color={{ base: "gray.900", _dark: "white" }}
+        textAlign="center"
       >
         {title}
       </Heading>
 
       <Text
         textAlign="center"
-        textWrap={"auto"}
-        fontSize={15}
+        textWrap={"balance"}
+        fontSize={{ base: "sm", md: "md" }}
         color={descColor}
       >
         {description}

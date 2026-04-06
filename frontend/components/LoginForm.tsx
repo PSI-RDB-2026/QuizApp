@@ -49,14 +49,14 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
     <Dialog.Body>
       <form onSubmit={onSubmit}>
         <Field.Root id={"username"}>
-          <Field.Label>Username</Field.Label>
+          <Field.Label>Email</Field.Label>
           <Input
-            {...register("username", { required: "Username is required" })}
-            placeholder="Enter your username"
+            {...register("email", { required: "Email is required" })}
+            placeholder="Enter your email"
           />
           <Field.ErrorText width={"full"}>
             <Field.ErrorIcon />
-            {errors.username && errors.username.message}
+            {errors.email && errors.email.message}
           </Field.ErrorText>
         </Field.Root>
 
