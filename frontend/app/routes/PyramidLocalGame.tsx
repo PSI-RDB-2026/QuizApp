@@ -121,56 +121,125 @@ function getNeighbors(row: number, col: number): Array<[number, number]> {
 
 function touchesAllSides(board: TileCell[][], player: Player): boolean {
   const visited = new Set<string>();
-  const stack: Array<[number, number]> = [];
-  let touchesLeft = false;
-  let touchesRight = false;
-  let touchesBottom = false;
 
-  board.forEach((row, rowIndex) => {
-    row.forEach((tile, colIndex) => {
-      if (
-        tile.state === player &&
-        (isOnSide(rowIndex, colIndex, "left") ||
-          isOnSide(rowIndex, colIndex, "right") ||
-          isOnSide(rowIndex, colIndex, "bottom"))
-      ) {
-        stack.push([rowIndex, colIndex]);
-      }
-    });
-  });
+  for (let row = 0; row < board.length; row += 1) {
+    for (let col = 0; col < board[row].length; col += 1) {
+      const startTile = board[row][col];
+      const startKey = `${row}-${col}`;
 
-  while (stack.length > 0) {
-    const [row, col] = stack.pop() as [number, number];
-    const key = `${row}-${col}`;
-
-    if (visited.has(key)) {
-      continue;
-    }
-
-    visited.add(key);
-
-    touchesLeft = touchesLeft || isOnSide(row, col, "left");
-    touchesRight = touchesRight || isOnSide(row, col, "right");
-    touchesBottom = touchesBottom || isOnSide(row, col, "bottom");
-
-    if (touchesLeft && touchesRight && touchesBottom) {
-      return true;
-    }
-
-    for (const [nextRow, nextCol] of getNeighbors(row, col)) {
-      const nextTile = board[nextRow]?.[nextCol];
-      if (!nextTile || nextTile.state !== player) {
+      if (startTile.state !== player || visited.has(startKey)) {
         continue;
       }
 
-      const nextKey = `${nextRow}-${nextCol}`;
-      if (!visited.has(nextKey)) {
-        stack.push([nextRow, nextCol]);
+      const stack: Array<[number, number]> = [[row, col]];
+      let touchesLeft = false;
+      let touchesRight = false;
+      let touchesBottom = false;
+
+      while (stack.length > 0) {
+        const [currentRow, currentCol] = stack.pop() as [number, number];
+        const key = `${currentRow}-${currentCol}`;
+
+        if (visited.has(key)) {
+          continue;
+        }
+
+        const tile = board[currentRow]?.[currentCol];
+        if (!tile || tile.state !== player) {
+          continue;
+        }
+
+        visited.add(key);
+
+        touchesLeft = touchesLeft || isOnSide(currentRow, currentCol, "left");
+        touchesRight =
+          touchesRight || isOnSide(currentRow, currentCol, "right");
+        touchesBottom =
+          touchesBottom || isOnSide(currentRow, currentCol, "bottom");
+
+        if (touchesLeft && touchesRight && touchesBottom) {
+          return true;
+        }
+
+        for (const [nextRow, nextCol] of getNeighbors(currentRow, currentCol)) {
+          const nextTile = board[nextRow]?.[nextCol];
+          if (!nextTile || nextTile.state !== player) {
+            continue;
+          }
+
+          const nextKey = `${nextRow}-${nextCol}`;
+          if (!visited.has(nextKey)) {
+            stack.push([nextRow, nextCol]);
+          }
+        }
       }
     }
   }
 
-  return touchesLeft && touchesRight && touchesBottom;
+  return false;
+}
+
+function hasPotentialThreeSideConnection(
+  board: TileCell[][],
+  player: Player,
+): boolean {
+  const blockedBy = otherPlayer(player);
+  const visited = new Set<string>();
+
+  for (let row = 0; row < board.length; row += 1) {
+    for (let col = 0; col < board[row].length; col += 1) {
+      const startTile = board[row][col];
+      const startKey = `${row}-${col}`;
+
+      if (startTile.state === blockedBy || visited.has(startKey)) {
+        continue;
+      }
+
+      const stack: Array<[number, number]> = [[row, col]];
+      let touchesLeft = false;
+      let touchesRight = false;
+      let touchesBottom = false;
+
+      while (stack.length > 0) {
+        const [currentRow, currentCol] = stack.pop() as [number, number];
+        const key = `${currentRow}-${currentCol}`;
+
+        if (visited.has(key)) {
+          continue;
+        }
+
+        const tile = board[currentRow]?.[currentCol];
+        if (!tile || tile.state === blockedBy) {
+          continue;
+        }
+
+        visited.add(key);
+        touchesLeft = touchesLeft || isOnSide(currentRow, currentCol, "left");
+        touchesRight =
+          touchesRight || isOnSide(currentRow, currentCol, "right");
+        touchesBottom =
+          touchesBottom || isOnSide(currentRow, currentCol, "bottom");
+
+        if (touchesLeft && touchesRight && touchesBottom) {
+          return true;
+        }
+
+        for (const [nextRow, nextCol] of getNeighbors(currentRow, currentCol)) {
+          const nextTile = board[nextRow]?.[nextCol];
+          if (!nextTile || nextTile.state === blockedBy) {
+            continue;
+          }
+
+          const nextKey = `${nextRow}-${nextCol}`;
+          if (!visited.has(nextKey)) {
+            stack.push([nextRow, nextCol]);
+          }
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 function questionTypeForTile(row: number, col: number): QuestionType {
@@ -331,6 +400,15 @@ export default function PyramidLocalGame() {
         endGame(
           player,
           `${PLAYER_META[player].label} connected all three sides and wins.`,
+        );
+        return nextBoard;
+      }
+
+      const blockedPlayer = otherPlayer(player);
+      if (!hasPotentialThreeSideConnection(nextBoard, blockedPlayer)) {
+        endGame(
+          player,
+          `${PLAYER_META[blockedPlayer].label} can no longer connect all three sides. ${PLAYER_META[player].label} wins.`,
         );
       }
 

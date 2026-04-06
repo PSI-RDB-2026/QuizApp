@@ -37,7 +37,10 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
       const response = await getLogin(data);
       if (response.data?.access_token) {
         // Store user data, token and update auth context
-        login({ ...data, access_token: response.data.access_token });
+        login({
+          ...data,
+          access_token: response.data.access_token,
+        });
         setOpen(false);
       }
     } catch (error) {

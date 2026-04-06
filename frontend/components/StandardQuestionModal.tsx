@@ -143,7 +143,7 @@ export default function StandardQuestion({
                 <HStack justify="end">
                   <Button
                     onClick={submit}
-                    colorPalette={mode === "steal" ? "orange" : "blue"}
+                    colorPalette={playerLabel == "Player 1" ? "blue" : "orange"}
                     loading={submitting}
                     disabled={submitting || !answer.trim()}
                   >
