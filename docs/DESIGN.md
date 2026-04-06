@@ -115,7 +115,7 @@ flowchart LR
     DB[(Database)]
 
     Browser -->|HTTP: Login, Get Quiz| Backend
-    Browser -->|Store answers locally| Browser
+    Backend -->|HTTP: Check Answer| DB
     Browser -->|HTTP: Submit answers| Backend
 
     DB -->|Load Questions| Backend
