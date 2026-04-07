@@ -13,7 +13,11 @@ export function meta({}: Route.MetaArgs) {
 export default function PyramidGameMenu() {
   const navigate = useNavigate();
   return (
-    <Container maxW="container.lg" padding={25}>
+    <Container
+      maxW="container.xl"
+      px={{ base: 4, md: 6 }}
+      py={{ base: 6, md: 8 }}
+    >
       <Button
         onClick={() => navigate("/")}
         variant={"surface"}
@@ -22,7 +26,13 @@ export default function PyramidGameMenu() {
       >
         &larr; Back to Main Menu
       </Button>
-      <Flex justifyContent={"center"} padding={25} gap={5}>
+      <Flex
+        direction={{ base: "column", md: "row" }}
+        justifyContent={"center"}
+        alignItems={{ base: "stretch", md: "stretch" }}
+        py={{ base: 4, md: 8 }}
+        gap={{ base: 4, md: 6 }}
+      >
         <GameModeCard
           title="Local Game"
           description="Conquer the pyramid of letters on your own."

@@ -4,13 +4,13 @@ from db.database import execute, fetch_one, fetch_all
 
 class QuestionsService:
     """Provides question-related operations"""
-    
+
     @staticmethod
     async def get_rand_question(
         question_type: Literal["standard", "yes_no"] = "standard",
-        ) -> dict | None:
+    ) -> dict | None:
         """Returns one random question, filtered by type."""
-        
+
         if question_type == "standard":
             question = await fetch_one(
                 """
@@ -29,10 +29,10 @@ class QuestionsService:
                 LIMIT 1
                 """
             )
-        
+
         if not question:
             return None
-        
+
         question_map = question._mapping
         return dict(question_map, question_type=question_type)
 
@@ -46,7 +46,7 @@ class QuestionsService:
         Validates answer for a question id and returns correctness + expected answer.
         Answer is either a string (for standard questions) or a boolean (for yes/no questions).
         """
-        
+
         if question_type == "standard":
             question = await fetch_one(
                 """
@@ -54,16 +54,17 @@ class QuestionsService:
                 FROM standard_questions
                 WHERE id = :id
                 """,
-                {"id": question_id}
+                {"id": question_id},
             )
-            
+
             if not question:
                 return None
-            
-            question = question._mapping
-            correct_answer = question._mapping["correct_answer"]
-            is_correct = answer.strip().lower() == correct_answer.strip().lower()
-            
+
+            question_map = question._mapping
+            correct_answer = str(question_map["correct_answer"]).strip().lower()
+            normalized_answer = str(answer).strip().lower()
+            is_correct = normalized_answer == correct_answer
+
         elif question_type == "yes_no":
             question = await fetch_one(
                 """
@@ -71,14 +72,14 @@ class QuestionsService:
                 FROM yes_no_questions
                 WHERE id = :id
                 """,
-                {"id": question_id}
+                {"id": question_id},
             )
-            
+
             if not question:
                 return None
-            
-            question = question._mapping
-            correct_answer = question["correct_answer"]
-            is_correct = answer == correct_answer # correct_answer is bool
-            
+
+            question_map = question._mapping
+            correct_answer = question_map["correct_answer"]
+            is_correct = answer == correct_answer  # correct_answer is bool
+
         return is_correct, correct_answer

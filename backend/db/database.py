@@ -1,6 +1,7 @@
-'''This module provides asynchronous database connection management
+"""This module provides asynchronous database connection management
 and query execution
-'''
+"""
+
 import os
 from contextlib import asynccontextmanager
 from sqlalchemy import text
@@ -20,12 +21,11 @@ def _normalize_params(args: tuple):
         return {}
     if len(args) == 1 and isinstance(args[0], dict):
         return args[0]
-    raise ValueError(
-        "Query parameters must be passed as a single dictionary argument.")
+    raise ValueError("Query parameters must be passed as a single dictionary argument.")
 
 
 async def init_db():
-    '''Initializes the database connection pool'''
+    """Initializes the database connection pool"""
     global POOL
     if POOL is not None:
         return
@@ -38,7 +38,7 @@ async def init_db():
 
 
 async def close_db():
-    '''Closes the database connection pool'''
+    """Closes the database connection pool"""
     global POOL
     if POOL is not None:
         await POOL.dispose()
@@ -47,7 +47,7 @@ async def close_db():
 
 @asynccontextmanager
 async def get_connection():
-    '''Provides an asynchronous context manager for database connections'''
+    """Provides an asynchronous context manager for database connections"""
     if POOL is None:
         await init_db()
 
@@ -56,7 +56,7 @@ async def get_connection():
 
 
 async def execute(query: str, *args):
-    '''Executes a query with the provided parameters'''
+    """Executes a query with the provided parameters"""
     params = _normalize_params(args)
     if POOL is None:
         await init_db()
@@ -66,7 +66,7 @@ async def execute(query: str, *args):
 
 
 async def fetch_one(query: str, *args):
-    '''Fetches a single row from the database'''
+    """Fetches a single row from the database"""
     params = _normalize_params(args)
     async with get_connection() as conn:
         result = await conn.execute(text(query), params)
@@ -74,7 +74,7 @@ async def fetch_one(query: str, *args):
 
 
 async def fetch_all(query: str, *args):
-    '''Fetches all rows from the database'''
+    """Fetches all rows from the database"""
     params = _normalize_params(args)
     async with get_connection() as conn:
         result = await conn.execute(text(query), params)

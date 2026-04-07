@@ -1,11 +1,7 @@
 import { Button, Flex, Icon } from "@chakra-ui/react";
-import {
-  ColorModeButton,
-  useColorMode,
-  useColorModeValue,
-} from "app/components/ui/color-mode";
+import { ColorModeButton } from "app/components/ui/color-mode";
 //import { LogOut } from "lucide-react";
-import { useEffect, useState, type FC } from "react";
+import { useState, type FC } from "react";
 import { LuLogIn, LuLogOut } from "react-icons/lu";
 import { ModalForm } from "./ModalForm";
 import { RegisterForm } from "./RegisterForm";
@@ -16,23 +12,21 @@ interface Props {}
 export const Header: FC<Props> = (props) => {
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showRegister, setShowRegister] = useState<boolean>(false);
-  const { user, isAuthenticated, logout } = useAuth();
-  const bg = useColorModeValue("white", "gray.800");
-  const color = useColorModeValue("gray.800", "white");
-  useEffect(() => {
-    console.log(showLogin);
-  }, [showLogin]);
+  const auth = useAuth();
+  const user = auth?.user;
+  const isAuthenticated = auth?.isAuthenticated ?? false;
+  const logout = auth?.logout ?? (() => undefined);
   return (
     <>
       <Flex
-        bg={bg}
-        color={color}
+        bg="bg"
+        color="fg"
         justifyContent="space-between"
         alignItems="center"
         padding={15}
         shadow={"lg"}
       >
-        <h2>Logo</h2>
+        <h2>QuizzApp</h2>
         <Flex gap={"1rem"} alignItems="center">
           <ColorModeButton colorPalette={"green"} />
           {!isAuthenticated ? (
@@ -50,7 +44,6 @@ export const Header: FC<Props> = (props) => {
               </Button>
             </>
           )}
-
         </Flex>
       </Flex>
     </>

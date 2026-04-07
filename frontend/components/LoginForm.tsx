@@ -37,7 +37,10 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
       const response = await getLogin(data);
       if (response.data?.access_token) {
         // Store user data, token and update auth context
-        login({ ...data, access_token: response.data.access_token });
+        login({
+          ...data,
+          access_token: response.data.access_token,
+        });
         setOpen(false);
       }
     } catch (error) {
@@ -49,14 +52,14 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
     <Dialog.Body>
       <form onSubmit={onSubmit}>
         <Field.Root id={"username"}>
-          <Field.Label>Username</Field.Label>
+          <Field.Label>Email</Field.Label>
           <Input
-            {...register("username", { required: "Username is required" })}
-            placeholder="Enter your username"
+            {...register("email", { required: "Email is required" })}
+            placeholder="Enter your email"
           />
           <Field.ErrorText width={"full"}>
             <Field.ErrorIcon />
-            {errors.username && errors.username.message}
+            {errors.email && errors.email.message}
           </Field.ErrorText>
         </Field.Root>
 

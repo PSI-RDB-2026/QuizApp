@@ -11,42 +11,52 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import { Wrapper } from "./Wrapper";
 import { Provider } from "./components/ui/provider";
-import {
-  ChakraProvider,
-  createSystem,
-  defaultConfig,
-  defaultSystem,
-  defineConfig,
-} from "@chakra-ui/react";
+import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 //import { LucideProvider } from "lucide-react";
 
 const config = defineConfig({
-  // TODO: Create green color pallete for green dark and light mode
   theme: {
+    tokens: {
+      colors: {
+        green: {
+          50: { value: "#f0fdf4" },
+          100: { value: "#dcfce7" },
+          200: { value: "#bbf7d0" },
+          300: { value: "#86efac" },
+          400: { value: "#4ade80" },
+          500: { value: "#22c55e" },
+          600: { value: "#16a34a" },
+          700: { value: "#15803d" },
+          800: { value: "#166534" },
+          900: { value: "#145231" },
+          950: { value: "#052e16" },
+        },
+      },
+    },
     semanticTokens: {
       colors: {
         bg: {
           DEFAULT: {
-            value: { _light: "{colors.white}", _dark: "#010804" }, // Custom dark background
+            value: { _light: "{colors.white}", _dark: "#010804" },
           },
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "#fbff00" }, // Custom dark subtle background
+            value: { _light: "{colors.gray.50}", _dark: "#1a1a1a" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "#a3791d" }, // Custom dark muted background
+            value: { _light: "{colors.gray.100}", _dark: "#2d2d2d" },
           },
         },
         fg: {
           DEFAULT: {
-            value: { _light: "{colors.black}", _dark: "#ffffff" }, // Custom dark text color
+            value: { _light: "{colors.gray.900}", _dark: "#ffffff" },
           },
           muted: {
-            value: { _light: "{colors.gray.600}", _dark: "#ffffff" }, // Custom dark muted text
+            value: { _light: "{colors.gray.600}", _dark: "#d1d5db" },
           },
         },
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "#404040" }, // Custom dark border
+            value: { _light: "{colors.gray.200}", _dark: "#404040" },
           },
         },
       },
@@ -57,7 +67,7 @@ export const customSystem = createSystem(defaultConfig, config);
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -65,11 +75,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-          <Provider>
-            <ChakraProvider value={customSystem}>{children}</ChakraProvider>
-            <ScrollRestoration />
-            <Scripts />
-          </Provider>
+        <Provider>
+          {children}
+          <ScrollRestoration />
+          <Scripts />
+        </Provider>
       </body>
     </html>
   );
