@@ -60,12 +60,12 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
   return (
     <Dialog.Body>
       <form onSubmit={onSubmit}>
-        <Field.Root id={"username"}>
+        <Field.Root id={"username"} invalid={!!errors.username}>
           <Field.Label>Username</Field.Label>
           <Input {...register("username")} placeholder="Enter your username" />
           <Field.ErrorText>Username is required</Field.ErrorText>
         </Field.Root>
-        <Field.Root id={"email"} marginTop={4}>
+        <Field.Root id={"email"} invalid={!!errors.email} marginTop={4}>
           <Field.Label>Email</Field.Label>
           <Input
             {...register("email")}
@@ -74,7 +74,7 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
           />
           <Field.ErrorText>Email is required</Field.ErrorText>
         </Field.Root>
-        <Field.Root id={"password"} marginTop={4}>
+        <Field.Root id={"password"} invalid={!!errors.password} marginTop={4}>
           <Field.Label>Password</Field.Label>
           <Input
             {...register("password")}
@@ -83,7 +83,11 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
           />
           <Field.ErrorText>Password is required</Field.ErrorText>
         </Field.Root>
-        <Field.Root id={"confirmPassword"} marginTop={4}>
+        <Field.Root
+          id={"confirmPassword"}
+          invalid={!!errors.confirmPassword}
+          marginTop={4}
+        >
           <Field.Label>Confirm Password</Field.Label>
           <Input
             {...register("confirmPassword")}

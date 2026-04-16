@@ -297,7 +297,7 @@ export default function PyramidLocalGame() {
     }
 
     const timer = window.setTimeout(() => {
-      setGameState("ended");
+      //setGameState("ended");
     }, 2500);
 
     return () => window.clearTimeout(timer);
@@ -309,13 +309,11 @@ export default function PyramidLocalGame() {
     }
 
     if (pickSeconds <= 0) {
-      const winnerPlayer = otherPlayer(turnPlayer);
-      endGame(
-        winnerPlayer,
-        `${PLAYER_META[turnPlayer].label} did not pick in time. ${PLAYER_META[winnerPlayer].label} wins.`,
-      );
+      const nextTurnPlayer = otherPlayer(turnPlayer);
+      setTurnPlayer(nextTurnPlayer);
+      setPickSeconds(PICK_SECONDS);
       setStatusPopup(
-        `${PLAYER_META[turnPlayer].label} did not pick in time. ${PLAYER_META[winnerPlayer].label} wins.`,
+        `${PLAYER_META[turnPlayer].label} did not pick in time. Turn passed to ${PLAYER_META[nextTurnPlayer].label}.`,
       );
       return;
     }

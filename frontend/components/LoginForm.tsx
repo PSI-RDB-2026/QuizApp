@@ -51,7 +51,7 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
   return (
     <Dialog.Body>
       <form onSubmit={onSubmit}>
-        <Field.Root id={"username"}>
+        <Field.Root id={"username"} invalid={!!errors.email}>
           <Field.Label>Email</Field.Label>
           <Input
             {...register("email", { required: "Email is required" })}
@@ -63,7 +63,7 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
           </Field.ErrorText>
         </Field.Root>
 
-        <Field.Root id={"password"} marginTop={4}>
+        <Field.Root id={"password"} invalid={!!errors.password} marginTop={4}>
           <Field.Label>Password</Field.Label>
           <Input
             {...register("password", { required: "Password is required" })}
@@ -81,6 +81,7 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
           </Button>
         </HStack>
       </form>
+
       <Dialog.Footer
         padding={0}
         justifyContent={"center"}
