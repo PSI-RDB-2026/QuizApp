@@ -70,7 +70,7 @@ def mock_user_db(sample_user, monkeypatch):
 
 @pytest.fixture
 def mock_question_db(monkeypatch):
-    """Mocks the QuestionsService question data."""
+    """Mocks QuestionsService methods to keep router tests DB-independent."""
     mock_standard = [
         {
             "id": 1,
@@ -101,7 +101,29 @@ def mock_question_db(monkeypatch):
             "category": "IT",
         },
     ]
-    # Patch the mock question data
-    monkeypatch.setattr(QuestionsService, "MOCK_STANDARD_QUESTIONS", mock_standard)
-    monkeypatch.setattr(QuestionsService, "MOCK_YES_NO_QUESTIONS", mock_yes_no)
+
+    async def fake_get_rand_question(question_type="standard"):
+        if question_type == "yes_no":
+            question = mock_yes_no[0]
+            return dict(question, question_type="yes_no")
+        question = mock_standard[0]
+        return dict(question, question_type="standard", initials=None)
+
+    async def fake_check_question(question_id: int, answer, question_type="standard"):
+        if question_type == "yes_no":
+            question = next((q for q in mock_yes_no if q["id"] == question_id), None)
+            if not question:
+                return None
+            correct_answer = question["correct_answer"]
+            return answer == correct_answer, correct_answer
+
+        question = next((q for q in mock_standard if q["id"] == question_id), None)
+        if not question:
+            return None
+        correct_answer = question["correct_answer"]
+        return str(answer).strip().lower() == correct_answer.lower(), correct_answer
+
+    monkeypatch.setattr(QuestionsService, "get_rand_question", staticmethod(fake_get_rand_question))
+    monkeypatch.setattr(QuestionsService, "check_question", staticmethod(fake_check_question))
+
     return {"standard": mock_standard, "yes_no": mock_yes_no}

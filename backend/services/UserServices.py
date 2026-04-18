@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 import jwt
 import os
 from models.UserModels import RegisterRequest
@@ -15,6 +16,7 @@ if current_dir not in os.sys.path:
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")
 
 password_hasher = PasswordHasher()
+logger = logging.getLogger(__name__)
 
 
 class UserServices:
@@ -45,9 +47,12 @@ class UserServices:
         '''Authenticate the user by checking the email and password.'''
         user = await UserServices.get_user(email)
         if not user:
+            logger.warning("authentication_failed_user_not_found", extra={"email": email})
             return False
         if not UserServices.verify_password(user["password"], password):
+            logger.warning("authentication_failed_invalid_password", extra={"email": email})
             return False
+        logger.info("authentication_succeeded", extra={"email": email})
         return True
 
     @staticmethod
@@ -63,10 +68,10 @@ class UserServices:
                 """,
                 {"email": email}
             )
-            print(user)
+            logger.debug("user_fetched", extra={"email": email, "found": user is not None})
             return user._mapping
         except Exception as e:
-            print(f"Error occurred while fetching user: {e}")
+            logger.exception("error_fetching_user", extra={"email": email})
             raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
         return None
 
@@ -86,8 +91,8 @@ class UserServices:
 
         to_encode.update({"exp": expire})
 
-        # print(str(to_encode), SECRET_KEY, ALGORITHM)  # Debugging output
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        logger.debug("access_token_created", extra={"email": data.get("email")})
         return encoded_jwt
 
     @staticmethod
@@ -104,9 +109,9 @@ class UserServices:
                 """,
                 {"email": email}
             )
-            print(user)
+            logger.debug("user_fetched_from_token", extra={"email": email, "found": user is not None})
         except Exception as e:
-            print(f"Error occurred while fetching user from token: {e}")
+            logger.exception("error_fetching_user_from_token", extra={"email": email})
             raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
         return user if user else None
 
@@ -118,7 +123,7 @@ class UserServices:
             "password": password_hasher.hash(user.password),
             "email": user.email
         }
-        print(new_user)
+        logger.info("user_creation_started", extra={"username": user.username, "email": user.email})
         crete_user_query = """
         INSERT INTO users (username, password_hash, email)
         VALUES (:username, :password, :email)
@@ -134,6 +139,7 @@ class UserServices:
             {"username": user.username}
         )
         user_from_db = user_from_db._mapping
+        logger.info("user_created", extra={"username": user_from_db["username"], "email": user_from_db["email"]})
         return {
             "username": user_from_db["username"],
             "email": user_from_db["email"]
@@ -148,6 +154,7 @@ class UserServices:
         """
         try:
             await execute(delete_user_query, {"username": user_name})
+            logger.info("user_deleted", extra={"username": user_name})
         except Exception as e:
-            print(f"Error occurred while deleting user: {e}")
+            logger.exception("error_deleting_user", extra={"username": user_name})
             raise HTTPException(status_code=404, detail="Uživatel nenalezen.")

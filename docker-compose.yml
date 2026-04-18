@@ -53,6 +53,7 @@ services:
     container_name: quizapp-backend
     environment:
       - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-quizapp}:${POSTGRES_PASSWORD:-quizapp_pass}@postgres:5432/${POSTGRES_DB:-quizapp}
     depends_on:
       postgres:
@@ -64,6 +65,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
