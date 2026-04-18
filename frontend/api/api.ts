@@ -51,9 +51,22 @@ export interface ApiErrorResponse {
   [key: string]: unknown;
 }
 
-const unwrapError = <T>(error: unknown, fallback: T): T => {
+const unwrapError = <T extends ApiErrorResponse>(
+  error: unknown,
+  fallback: T,
+): T => {
   if (axios.isAxiosError(error)) {
-    return (error.response?.data as T) ?? fallback;
+    const payload = error.response?.data;
+
+    if (payload && typeof payload === "object") {
+      return payload as T;
+    }
+
+    if (typeof payload === "string" && payload.trim()) {
+      return { ...fallback, message: payload };
+    }
+
+    return fallback;
   }
 
   return fallback;

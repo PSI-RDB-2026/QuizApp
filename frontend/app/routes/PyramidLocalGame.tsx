@@ -242,8 +242,8 @@ function hasPotentialThreeSideConnection(
   return false;
 }
 
-function questionTypeForTile(row: number, col: number): QuestionType {
-  return (row + col) % 2 === 0 ? "standard" : "yes_no";
+function questionTypeForTile(tile: TileCell): QuestionType {
+  return tile.state === "black" ? "yes_no" : "standard";
 }
 
 export function meta() {
@@ -371,7 +371,7 @@ export default function PyramidLocalGame() {
 
     setPickSeconds(PICK_SECONDS);
     setStatusPopup("");
-    void loadQuestion(row, col, turnPlayer, questionTypeForTile(row, col));
+    void loadQuestion(row, col, turnPlayer, questionTypeForTile(tile));
   };
 
   const updateTile = (row: number, col: number, state: TileState) => {
