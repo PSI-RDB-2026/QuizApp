@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
+    { title: "QuizApp" },
     { name: "description", content: "Welcome to React Router!" },
   ];
 }

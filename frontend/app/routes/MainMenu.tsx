@@ -6,7 +6,7 @@ import { Container, Flex } from "@chakra-ui/react";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
+    { title: "QuizApp" },
     { name: "description", content: "Welcome to React Router!" },
   ];
 }

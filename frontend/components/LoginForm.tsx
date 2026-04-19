@@ -7,20 +7,57 @@ import {
   Separator,
   Text,
 } from "@chakra-ui/react";
-import { useColorModeValue } from "app/components/ui/color-mode";
+import type { AxiosResponse } from "axios";
 import type { FC } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleIcon } from "./General/CustomIcons";
 import { useAuth } from "app/providers/AuthProvider";
-import { getLogin } from "api/api";
+import {
+  getLogin,
+  type ApiErrorResponse,
+  type TokenResponse,
+} from "api/api";
 
 interface Props {
   setOpen: (open: boolean) => void;
 }
 
 interface FormValues {
-  username: string;
+  email: string;
   password: string;
+}
+
+type FeedbackState = {
+  status: "error" | "success";
+  message: string;
+};
+
+function getErrorMessage(error: ApiErrorResponse): string {
+  if (typeof error.detail === "string" && error.detail.trim()) {
+    return error.detail;
+  }
+
+  if (typeof error.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Login failed. Please check your credentials and try again.";
+}
+
+function isTokenSuccessResponse(
+  response: AxiosResponse<TokenResponse> | ApiErrorResponse,
+): response is AxiosResponse<TokenResponse> {
+  if (typeof response !== "object" || response === null || !("data" in response)) {
+    return false;
+  }
+
+  const payload = response.data;
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "access_token" in payload
+  );
 }
 
 export const LoginForm: FC<Props> = ({ setOpen }) => {
@@ -29,29 +66,46 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>();
+  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const { login } = useAuth();
-  const buttonBg = useColorModeValue("green.400", "green.600");
 
   const onSubmit = handleSubmit(async (data: FormValues) => {
+    setFeedback(null);
+
     try {
       const response = await getLogin(data);
-      if (response.data?.access_token) {
+      if (isTokenSuccessResponse(response)) {
         // Store user data, token and update auth context
         login({
           ...data,
           access_token: response.data.access_token,
         });
+
+        setFeedback({
+          status: "success",
+          message: "Signed in successfully.",
+        });
         setOpen(false);
+        return;
       }
+
+      setFeedback({
+        status: "error",
+        message: getErrorMessage(response as ApiErrorResponse),
+      });
     } catch (error) {
       console.error("Login failed:", error);
+      setFeedback({
+        status: "error",
+        message: "An unexpected error occurred. Please try again.",
+      });
     }
   });
 
   return (
     <Dialog.Body>
       <form onSubmit={onSubmit}>
-        <Field.Root id={"username"}>
+        <Field.Root id={"email"} invalid={!!errors.email}>
           <Field.Label>Email</Field.Label>
           <Input
             {...register("email", { required: "Email is required" })}
@@ -63,7 +117,7 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
           </Field.ErrorText>
         </Field.Root>
 
-        <Field.Root id={"password"} marginTop={4}>
+        <Field.Root id={"password"} marginTop={4} invalid={!!errors.password}>
           <Field.Label>Password</Field.Label>
           <Input
             {...register("password", { required: "Password is required" })}
@@ -76,10 +130,26 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
         </Field.Root>
 
         <HStack marginTop={6} marginBottom={3}>
-          <Button variant="solid" flex={1} type="submit" colorPalette={"green"}>
+          <Button
+            variant="solid"
+            flex={1}
+            type="submit"
+            colorPalette={"green"}
+            loading={isSubmitting}
+          >
             Sign In
           </Button>
         </HStack>
+
+        {feedback ? (
+          <Text
+            fontSize="sm"
+            color={feedback.status === "error" ? "red.500" : "green.500"}
+            mb={2}
+          >
+            {feedback.message}
+          </Text>
+        ) : null}
       </form>
       <Dialog.Footer
         padding={0}

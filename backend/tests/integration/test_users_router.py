@@ -1,6 +1,7 @@
 """Integration tests for Users router with service-layer mocks."""
 
 import pytest
+from fastapi import HTTPException
 
 from services.UserServices import UserServices
 
@@ -69,6 +70,46 @@ class TestUsersRouterRegister:
 
         assert response.status_code == 200
         assert "access_token" in response.json()
+
+    def test_register_with_duplicate_email_returns_409(self, test_client, monkeypatch):
+        async def fake_create_user_raises_duplicate(credentials):
+            raise HTTPException(status_code=409, detail="Email already exists.")
+
+        monkeypatch.setattr(
+            UserServices,
+            "create_user",
+            staticmethod(fake_create_user_raises_duplicate),
+        )
+
+        payload = {
+            "username": "existing_user",
+            "email": "existing@example.com",
+            "password": "new_password_123",
+        }
+        response = test_client.post("/api/users/register", json=payload)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Email already exists."
+
+    def test_register_with_duplicate_username_returns_409(self, test_client, monkeypatch):
+        async def fake_create_user_raises_duplicate(credentials):
+            raise HTTPException(status_code=409, detail="Username already exists.")
+
+        monkeypatch.setattr(
+            UserServices,
+            "create_user",
+            staticmethod(fake_create_user_raises_duplicate),
+        )
+
+        payload = {
+            "username": "existing_user",
+            "email": "newemail@example.com",
+            "password": "new_password_123",
+        }
+        response = test_client.post("/api/users/register", json=payload)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Username already exists."
 
 
 class TestUsersRouterTokenRenew:

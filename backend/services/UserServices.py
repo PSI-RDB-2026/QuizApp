@@ -6,6 +6,7 @@ from models.UserModels import RegisterRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from db.database import execute, fetch_one, fetch_all
 
 ALGORITHM = "HS256"
@@ -128,7 +129,35 @@ class UserServices:
         INSERT INTO users (username, password_hash, email)
         VALUES (:username, :password, :email)
         """
-        await execute(crete_user_query, new_user)
+        try:
+            await execute(crete_user_query, new_user)
+        except IntegrityError as e:
+            error_text = str(getattr(e, "orig", e)).lower()
+            if "key (email)" in error_text or "users_pkey" in error_text:
+                logger.warning(
+                    "user_creation_duplicate_email",
+                    extra={"username": user.username, "email": user.email},
+                )
+                raise HTTPException(status_code=409, detail="Email already exists.")
+
+            if "key (username)" in error_text or "users_username_key" in error_text:
+                logger.warning(
+                    "user_creation_duplicate_username",
+                    extra={"username": user.username, "email": user.email},
+                )
+                raise HTTPException(status_code=409, detail="Username already exists.")
+
+            logger.exception(
+                "user_creation_integrity_error",
+                extra={"username": user.username, "email": user.email},
+            )
+            raise HTTPException(status_code=500, detail="Could not create user.")
+        except Exception:
+            logger.exception(
+                "user_creation_failed",
+                extra={"username": user.username, "email": user.email},
+            )
+            raise HTTPException(status_code=500, detail="Could not create user.")
 
         user_from_db = await fetch_one(
             """
@@ -138,6 +167,13 @@ class UserServices:
             """,
             {"username": user.username}
         )
+        if user_from_db is None:
+            logger.error(
+                "user_created_but_not_fetchable",
+                extra={"username": user.username, "email": user.email},
+            )
+            raise HTTPException(status_code=500, detail="Could not create user.")
+
         user_from_db = user_from_db._mapping
         logger.info("user_created", extra={"username": user_from_db["username"], "email": user_from_db["email"]})
         return {
