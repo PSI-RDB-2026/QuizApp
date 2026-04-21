@@ -8,4 +8,5 @@ export default [
     "pyramidGameMenu/multiplayerGame",
     "./routes/PyramidMultiplayerGame.tsx",
   ),
+  route("leaderboards", "./routes/Leaderboards.tsx"),
 ] satisfies RouteConfig;
