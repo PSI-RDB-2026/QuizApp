@@ -288,6 +288,10 @@ flowchart LR
 
 Plan for Logging, Monitoring, Alerting, and defined SLA/SLO/SLI metrics.
 
+Backend logging is centralized in `backend/logging_config.py` and keeps the existing structured JSON stdout output for container logs. When the Azure Container App exposes `APPLICATIONINSIGHTS_CONNECTION_STRING`, the backend also initializes Azure Monitor OpenTelemetry so the same Python logs are exported to Application Insights.
+
+Request IDs and request metadata are attached to each log record to make traces and failures easier to correlate in Azure.
+
 ## Security Architecture
 
 Auth login flow: email stores in PostgreSQL. User presents the token and upon validation backend issues JSON Web Token back to the React app which stores it localStorage.

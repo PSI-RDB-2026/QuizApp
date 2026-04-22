@@ -1,10 +1,13 @@
 name: Build and Deploy to Azure
 
 on:
-  workflow_run:
-    workflows: ["Test Suite"]
-    types: [completed]
+  push:
     branches: [main]
+    paths-ignore:
+      - 'prototype/**'
+      - 'docs/**'
+      - 'diagrams/**'
+      - 'README.md'
 
 env:
   REGISTRY: quizapppsi.azurecr.io
@@ -13,7 +16,6 @@ env:
 
 jobs:
   build-and-deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -49,4 +51,3 @@ jobs:
           file: nginx/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-proxy:latest
-
