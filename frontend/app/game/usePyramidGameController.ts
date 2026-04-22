@@ -104,9 +104,10 @@ export function usePyramidGameController(
     }
 
     if (pickSeconds <= 0) {
-      const winnerPlayer = otherPlayer(turnPlayer);
-      const timeoutMessage = `${PLAYER_META[turnPlayer].label} did not pick in time. ${PLAYER_META[winnerPlayer].label} wins.`;
-      endGame(winnerPlayer, timeoutMessage);
+      const nextPlayer = otherPlayer(turnPlayer);
+      const timeoutMessage = `${PLAYER_META[turnPlayer].label} did not pick in time. ${PLAYER_META[nextPlayer].label}'s turn.`;
+      setTurnPlayer(nextPlayer);
+      setPickSeconds(PICK_SECONDS);
       setStatusPopup(timeoutMessage);
       return;
     }
