@@ -5,8 +5,14 @@ import sys
 from contextvars import ContextVar
 from datetime import datetime, timezone
 
+try:
+    from azure.monitor.opentelemetry import configure_azure_monitor
+except ImportError:  # pragma: no cover - optional dependency for Azure deployments
+    configure_azure_monitor = None
+
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
+_azure_monitor_configured = False
 
 
 _STANDARD_RECORD_FIELDS = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys())
@@ -64,3 +70,20 @@ def configure_logging(log_level: str | None = None) -> None:
         logger.handlers.clear()
         logger.propagate = True
         logger.setLevel(resolved_level)
+
+
+def configure_application_insights() -> None:
+    global _azure_monitor_configured
+
+    if _azure_monitor_configured or configure_azure_monitor is None:
+        return
+
+    connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
+    if not connection_string:
+        return
+
+    configure_azure_monitor(
+        connection_string=connection_string,
+        disable_offline_storage=True,
+    )
+    _azure_monitor_configured = True

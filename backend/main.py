@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from logging_config import configure_logging
+from logging_config import configure_application_insights, configure_logging
 from middleware import RequestContextMiddleware
 import routers.questions as QuestionsRouter
 import routers.health as HealthRouter
@@ -15,6 +15,7 @@ from db.database import close_db, init_db
 
 
 configure_logging()
+configure_application_insights()
 logger = logging.getLogger(__name__)
 
 
