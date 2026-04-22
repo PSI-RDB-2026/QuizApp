@@ -3,7 +3,7 @@ import { ColorModeButton } from "app/components/ui/color-mode";
 //import { LogOut } from "lucide-react";
 import { useState, type FC } from "react";
 import { LuLogIn, LuLogOut } from "react-icons/lu";
-import { useNavigate } from "react-router";
+import { Link as RouterLink, useNavigate } from "react-router";
 import { ModalForm } from "./ModalForm";
 import { RegisterForm } from "./RegisterForm";
 import { useAuth } from "app/providers/AuthProvider";
@@ -28,7 +28,16 @@ export const Header: FC<Props> = (props) => {
         padding={15}
         shadow={"lg"}
       >
-        <h2>QuizzApp</h2>
+        <RouterLink
+          to="/"
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            textDecoration: "none",
+          }}
+        >
+          QuizApp
+        </RouterLink>
         <Flex gap={"1rem"} alignItems="center">
           <ColorModeButton colorPalette={"green"} />
           <Button
