@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.exc import IntegrityError
 
 
 DATABASE_URL = os.environ.get(
@@ -29,15 +30,10 @@ async def _run_sql_file(conn, file_path: Path):
 
 async def _bootstrap_database():
     sql_dir = Path(__file__).resolve().parent / "sql"
-    schema_path = sql_dir / "01_QuizAppDB.sql"
-    seed_path = sql_dir / "02_Questions.sql"
+    bootstrap_path = sql_dir / "bootstrap.sql"
 
     async with POOL.begin() as conn:
-        users_table = await conn.scalar(text("SELECT to_regclass('public.users')"))
-        if users_table is None:
-            await _run_sql_file(conn, schema_path)
-
-        await _run_sql_file(conn, seed_path)
+        await _run_sql_file(conn, bootstrap_path)
 
 
 def _normalize_params(args: tuple):
@@ -111,6 +107,9 @@ async def execute(query: str, *args):
                 extra={"duration_ms": duration_ms, "query": query[:200]},
             )
         return result
+    except IntegrityError:
+        logger.warning("database_integrity_violation", extra={"query": query[:200]})
+        raise
     except Exception:
         logger.exception("database_query_failed", extra={"query": query[:200]})
         raise
