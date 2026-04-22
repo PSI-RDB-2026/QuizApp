@@ -10,6 +10,7 @@ from middleware import RequestContextMiddleware
 import routers.questions as QuestionsRouter
 import routers.health as HealthRouter
 import routers.Users as UsersRouter
+import routers.multiplayer as MultiplayerRouter
 from db.database import close_db, init_db
 
 
@@ -38,6 +39,7 @@ app = FastAPI()
 app.include_router(HealthRouter.router)
 app.include_router(QuestionsRouter.router)
 app.include_router(UsersRouter.router)
+app.include_router(MultiplayerRouter.router)
 
 app.add_middleware(RequestContextMiddleware)
 
