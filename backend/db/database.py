@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -17,6 +18,26 @@ DATABASE_URL = os.environ.get(
 
 POOL = None
 logger = logging.getLogger(__name__)
+
+
+async def _run_sql_file(conn, file_path: Path):
+    sql_text = file_path.read_text(encoding="utf-8")
+    for statement in (part.strip() for part in sql_text.split(";")):
+        if statement:
+            await conn.execute(text(statement))
+
+
+async def _bootstrap_database():
+    sql_dir = Path(__file__).resolve().parent / "sql"
+    schema_path = sql_dir / "01_QuizAppDB.sql"
+    seed_path = sql_dir / "02_Questions.sql"
+
+    async with POOL.begin() as conn:
+        users_table = await conn.scalar(text("SELECT to_regclass('public.users')"))
+        if users_table is None:
+            await _run_sql_file(conn, schema_path)
+
+        await _run_sql_file(conn, seed_path)
 
 
 def _normalize_params(args: tuple):
@@ -40,6 +61,7 @@ async def init_db():
     try:
         async with POOL.connect() as conn:
             await conn.execute(text("SELECT 1"))
+        await _bootstrap_database()
         logger.info(
             "database_initialized",
             extra={"duration_ms": round((time.perf_counter() - started_at) * 1000, 2)},

@@ -70,11 +70,10 @@ class UserServices:
                 {"email": email}
             )
             logger.debug("user_fetched", extra={"email": email, "found": user is not None})
-            return user._mapping
-        except Exception as e:
+            return user._mapping if user else None
+        except Exception:
             logger.exception("error_fetching_user", extra={"email": email})
-            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
-        return None
+            raise HTTPException(status_code=500, detail="Could not fetch user.")
 
     @staticmethod
     async def create_access_token(
@@ -111,9 +110,9 @@ class UserServices:
                 {"email": email}
             )
             logger.debug("user_fetched_from_token", extra={"email": email, "found": user is not None})
-        except Exception as e:
+        except Exception:
             logger.exception("error_fetching_user_from_token", extra={"email": email})
-            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
+            raise HTTPException(status_code=500, detail="Could not fetch user.")
         return user if user else None
 
     @staticmethod
