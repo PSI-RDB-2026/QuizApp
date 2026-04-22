@@ -36,7 +36,7 @@ export default function MainMenu() {
     <Container maxW="container.lg" padding={25}>
       <Flex justifyContent={"center"}>
         <GameModeCard
-          title="AZ Pyramida"
+          title="AZ Pyramid"
           description="Conquer the pyramid of letters."
           navigateTo={"/pyramidGameMenu"}
           color="bg-primary"
