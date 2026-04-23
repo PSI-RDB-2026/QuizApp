@@ -76,6 +76,7 @@ export interface QueueStatusResponse {
   queue_position: number | null;
   waited_seconds: number;
   elo_window: number | null;
+  matched_match_id?: number | null;
 }
 
 export interface MatchParticipant {
@@ -334,7 +335,9 @@ export const getMultiplayerMatch = async (
     );
     return response.data as MatchStateResponse;
   } catch (error: unknown) {
-    console.error("Error fetching multiplayer match:", error);
+    if (axios.isAxiosError(error) && error.response?.status !== 404) {
+      console.error("Error fetching multiplayer match:", error);
+    }
     return unwrapError(error, { message: "Unknown error" });
   }
 };

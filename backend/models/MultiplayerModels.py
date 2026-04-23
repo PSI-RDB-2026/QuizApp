@@ -26,6 +26,7 @@ class QueueStatusResponse(BaseModel):
     queue_position: int | None = None
     waited_seconds: int = 0
     elo_window: int | None = None
+    matched_match_id: int | None = None
 
 
 class MatchParticipant(BaseModel):

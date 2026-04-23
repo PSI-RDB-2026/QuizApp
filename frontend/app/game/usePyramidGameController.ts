@@ -19,7 +19,7 @@ import {
   touchesAllSides,
 } from "./pyramidRules";
 
-interface ActiveChallenge {
+export interface ActiveChallenge {
   row: number;
   col: number;
   ownerPlayer: Player;
@@ -28,9 +28,23 @@ interface ActiveChallenge {
   question: QuestionResponse;
 }
 
-interface GameResult {
+export interface GameResult {
   winner: Player;
   message: string;
+}
+
+export interface PyramidGameSnapshot {
+  board: TileCell[][];
+  turnPlayer: Player;
+  winner: Player | null;
+  gameState: GameState;
+  gameResult: GameResult | null;
+  phase: Phase;
+  pickSeconds: number;
+  questionSeconds: number;
+  switchSeconds: number;
+  statusPopup: string;
+  activeChallenge: ActiveChallenge | null;
 }
 
 export const PICK_SECONDS = 10;
@@ -39,15 +53,18 @@ const ANSWER_REVEAL_MS = 2200;
 
 interface UsePyramidGameControllerOptions {
   transport?: GameTransport;
+  initialTurnPlayer?: Player;
+  externalSnapshot?: PyramidGameSnapshot | null;
 }
 
 export function usePyramidGameController(
   options?: UsePyramidGameControllerOptions,
 ) {
   const transport = options?.transport ?? localGameTransport;
+  const openingPlayer = options?.initialTurnPlayer;
   const [board, setBoard] = useState<TileCell[][]>(() => createBoard());
-  const [turnPlayer, setTurnPlayer] = useState<Player>(() =>
-    Math.random() < 0.5 ? "player1" : "player2",
+  const [turnPlayer, setTurnPlayer] = useState<Player>(
+    () => openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2"),
   );
   const [winner, setWinner] = useState<Player | null>(null);
   const [gameState, setGameState] = useState<GameState>("playing");
@@ -61,11 +78,31 @@ export function usePyramidGameController(
   const [activeChallenge, setActiveChallenge] =
     useState<ActiveChallenge | null>(null);
 
+  useEffect(() => {
+    const snapshot = options?.externalSnapshot;
+    if (!snapshot) {
+      return;
+    }
+
+    setBoard(snapshot.board);
+    setTurnPlayer(snapshot.turnPlayer);
+    setWinner(snapshot.winner);
+    setGameState(snapshot.gameState);
+    setGameResult(snapshot.gameResult);
+    setPhase(snapshot.phase);
+    setPickSeconds(snapshot.pickSeconds);
+    setQuestionSeconds(snapshot.questionSeconds);
+    setSwitchSeconds(snapshot.switchSeconds);
+    setStatusPopup(snapshot.statusPopup);
+    setActiveChallenge(snapshot.activeChallenge);
+  }, [options?.externalSnapshot]);
+
   const startNewGame = () => {
-    const openingPlayer = Math.random() < 0.5 ? "player1" : "player2";
+    const nextOpeningPlayer =
+      openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2");
 
     setBoard(createBoard());
-    setTurnPlayer(openingPlayer);
+    setTurnPlayer(nextOpeningPlayer);
     setWinner(null);
     setGameState("playing");
     setGameResult(null);

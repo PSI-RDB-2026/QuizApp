@@ -8,8 +8,11 @@ from fastapi import WebSocket
 class MultiplayerRealtimeService:
     _connections: dict[int, dict[str, WebSocket]] = {}
     _disconnect_tasks: dict[tuple[int, str], asyncio.Task] = {}
+    _snapshots: dict[int, dict] = {}
 
-    DISCONNECT_GRACE_SECONDS = int(os.getenv("MULTIPLAYER_DISCONNECT_GRACE_SECONDS", "30"))
+    DISCONNECT_GRACE_SECONDS = int(
+        os.getenv("MULTIPLAYER_DISCONNECT_GRACE_SECONDS", "30")
+    )
 
     @staticmethod
     async def connect(match_id: int, player_email: str, websocket: WebSocket):
@@ -43,12 +46,26 @@ class MultiplayerRealtimeService:
             MultiplayerRealtimeService.disconnect(match_id, player_email)
 
     @staticmethod
-    async def send_to_player(match_id: int, player_email: str, event: str, payload: dict):
+    async def send_to_player(
+        match_id: int, player_email: str, event: str, payload: dict
+    ):
         room = MultiplayerRealtimeService._connections.get(match_id, {})
         websocket = room.get(player_email)
         if not websocket:
             return
         await websocket.send_json({"event": event, "payload": payload})
+
+    @staticmethod
+    def set_snapshot(match_id: int, snapshot: dict):
+        MultiplayerRealtimeService._snapshots[match_id] = snapshot
+
+    @staticmethod
+    def get_snapshot(match_id: int) -> dict | None:
+        return MultiplayerRealtimeService._snapshots.get(match_id)
+
+    @staticmethod
+    def clear_snapshot(match_id: int):
+        MultiplayerRealtimeService._snapshots.pop(match_id, None)
 
     @staticmethod
     def cancel_disconnect_timer(match_id: int, player_email: str):
@@ -64,8 +81,12 @@ class MultiplayerRealtimeService:
                 await asyncio.sleep(MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS)
                 await on_timeout(match_id, player_email)
             finally:
-                MultiplayerRealtimeService._disconnect_tasks.pop((match_id, player_email), None)
+                MultiplayerRealtimeService._disconnect_tasks.pop(
+                    (match_id, player_email), None
+                )
 
         key = (match_id, player_email)
         MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_email)
-        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(timer_task())
+        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(
+            timer_task()
+        )
