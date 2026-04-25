@@ -14,10 +14,7 @@ export const Header: FC<Props> = (props) => {
   const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showRegister, setShowRegister] = useState<boolean>(false);
-  const auth = useAuth();
-  const user = auth?.user;
-  const isAuthenticated = auth?.isAuthenticated ?? false;
-  const logout = auth?.logout ?? (() => undefined);
+  const { user, logout } = useAuth();
   return (
     <>
       <Flex
@@ -47,11 +44,12 @@ export const Header: FC<Props> = (props) => {
           >
             Leaderboards
           </Button>
-          {!isAuthenticated ? (
-            <ModalForm />
-          ) : (
+          {user ? (
             <>
-              <p>Welcome, {user?.username}!</p>
+              <p>
+                Welcome,{" "}
+                {user?.firebaseUser?.displayName || user?.firebaseUser?.email}!
+              </p>
               <Button
                 variant="outline"
                 rounded={"full"}
@@ -61,6 +59,8 @@ export const Header: FC<Props> = (props) => {
                 <Icon as={LuLogOut} size={"sm"} />
               </Button>
             </>
+          ) : (
+            <ModalForm />
           )}
         </Flex>
       </Flex>

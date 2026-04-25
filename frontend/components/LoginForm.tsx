@@ -13,11 +13,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleIcon } from "./General/CustomIcons";
 import { useAuth } from "app/providers/AuthProvider";
-import {
-  getLogin,
-  type ApiErrorResponse,
-  type TokenResponse,
-} from "api/api";
+import { getLogin, type ApiErrorResponse, type TokenResponse } from "api/api";
+import { googleLogin, loginUser } from "app/firebase/authentication";
 
 interface Props {
   setOpen: (open: boolean) => void;
@@ -48,15 +45,17 @@ function getErrorMessage(error: ApiErrorResponse): string {
 function isTokenSuccessResponse(
   response: AxiosResponse<TokenResponse> | ApiErrorResponse,
 ): response is AxiosResponse<TokenResponse> {
-  if (typeof response !== "object" || response === null || !("data" in response)) {
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    !("data" in response)
+  ) {
     return false;
   }
 
   const payload = response.data;
   return (
-    typeof payload === "object" &&
-    payload !== null &&
-    "access_token" in payload
+    typeof payload === "object" && payload !== null && "access_token" in payload
   );
 }
 
@@ -69,36 +68,37 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const { login } = useAuth();
 
-  const onSubmit = handleSubmit(async (data: FormValues) => {
-    setFeedback(null);
-
+  const googleLoginHandler = async () => {
+    var user: any = null;
     try {
-      const response = await getLogin(data);
-      if (isTokenSuccessResponse(response)) {
-        // Store user data, token and update auth context
-        login({
-          ...data,
-          access_token: response.data.access_token,
-        });
+      user = await googleLogin();
+    } catch (error) {
+      console.error("Error logging in with Google:", error);
+    }
+    if (user) {
+      login(user);
+      setOpen(false);
+    }
+  };
 
-        setFeedback({
-          status: "success",
-          message: "Signed in successfully.",
-        });
-        setOpen(false);
-        return;
-      }
-
-      setFeedback({
-        status: "error",
-        message: getErrorMessage(response as ApiErrorResponse),
-      });
+  const onSubmit = handleSubmit(async (data: FormValues) => {
+    var user: any = null;
+    try {
+      user = await loginUser(data.email, data.password);
     } catch (error) {
       console.error("Login failed:", error);
       setFeedback({
         status: "error",
         message: "An unexpected error occurred. Please try again.",
       });
+    }
+    if (user) {
+      login(user);
+      setFeedback({
+        status: "success",
+        message: "Signed in successfully.",
+      });
+      setOpen(false);
     }
   });
 
@@ -163,7 +163,12 @@ export const LoginForm: FC<Props> = ({ setOpen }) => {
           <Separator flex={1} />
         </HStack>
         <HStack>
-          <Button variant="outline" flex={1} colorPalette={"green"}>
+          <Button
+            variant="outline"
+            flex={1}
+            colorPalette={"green"}
+            onClick={googleLoginHandler}
+          >
             <GoogleIcon />
             <span>Continue with Google</span>
           </Button>

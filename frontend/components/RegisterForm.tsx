@@ -18,6 +18,7 @@ import {
   type TokenResponse,
 } from "api/api";
 import { useAuth } from "app/providers/AuthProvider";
+import { googleLogin, registerUser } from "app/firebase/authentication";
 
 interface Props {
   setOpen: (open: boolean) => void;
@@ -49,15 +50,17 @@ function getErrorMessage(error: ApiErrorResponse): string {
 function isTokenSuccessResponse(
   response: AxiosResponse<TokenResponse> | ApiErrorResponse,
 ): response is AxiosResponse<TokenResponse> {
-  if (typeof response !== "object" || response === null || !("data" in response)) {
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    !("data" in response)
+  ) {
     return false;
   }
 
   const payload = response.data;
   return (
-    typeof payload === "object" &&
-    payload !== null &&
-    "access_token" in payload
+    typeof payload === "object" && payload !== null && "access_token" in payload
   );
 }
 
@@ -69,47 +72,50 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>();
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const auth = useAuth();
+  const { login } = useAuth();
+
+  const googleLoginHandler = async () => {
+    var user: any = null;
+    try {
+      user = await googleLogin();
+    } catch (error) {
+      console.error("Errot logging in with Google:", error);
+    }
+    if (user) {
+      login(user);
+      setOpen(false);
+    }
+  };
 
   const onSubmit = handleSubmit(async (data: FormValues) => {
-    setFeedback(null);
-
+    console.log("Form data:", data);
+    if (data.password !== data.confirmPassword) {
+      console.error("Passwords do not match");
+      return;
+    }
     const registerInfo = {
       username: data.username,
       email: data.email,
       password: data.password,
     };
-
+    var user: any = null;
     try {
-      const response = await postRegister(registerInfo);
-      if (isTokenSuccessResponse(response)) {
-        // Store token and update auth context
-        const user = {
-          username: data.username,
-          email: data.email,
-          access_token: response.data.access_token,
-        };
-        auth?.login(user);
-
-        setFeedback({
-          status: "success",
-          message: "Account created successfully.",
-        });
-        setOpen(false);
-        return;
-      }
-
-      setFeedback({
-        status: "error",
-        message: getErrorMessage(response as ApiErrorResponse),
-      });
+      user = await registerUser(data.email, data.password);
     } catch (error) {
-      console.error("Registration failed:", error);
+      console.error("Firebase registration failed:", error);
       setFeedback({
         status: "error",
         message: "An unexpected error occurred. Please try again.",
       });
+      return;
     }
+    console.log("Registered user:", user);
+    login(user);
+    setFeedback({
+      status: "success",
+      message: "Account created successfully.",
+    });
+    setOpen(false);
   });
 
   const passwordValue = watch("password");
@@ -200,7 +206,12 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
           <Separator flex={1} />
         </HStack>
         <HStack>
-          <Button variant="outline" flex={1} colorPalette={"green"}>
+          <Button
+            variant="outline"
+            flex={1}
+            colorPalette={"green"}
+            onClick={googleLoginHandler}
+          >
             <GoogleIcon />
             <span>Continue with Google</span>
           </Button>
