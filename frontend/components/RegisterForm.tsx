@@ -79,7 +79,7 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
     try {
       user = await googleLogin();
     } catch (error) {
-      console.error("Errot logging in with Google:", error);
+      console.error("Error logging in with Google:", error);
     }
     if (user) {
       login(user);
@@ -99,8 +99,9 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
       password: data.password,
     };
     var user: any = null;
+    console.log(registerInfo);
     try {
-      user = await registerUser(data.email, data.password);
+      user = await registerUser(data.email, data.password, data.username);
     } catch (error) {
       console.error("Firebase registration failed:", error);
       setFeedback({

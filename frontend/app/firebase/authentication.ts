@@ -5,13 +5,18 @@ import {
   signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
+  updateProfile,
 } from "firebase/auth";
 import { auth } from "./configuration";
 import { AppUser } from "app/models/AppUser";
 
 const googleProvider = new GoogleAuthProvider();
 
-export const registerUser = async (email: string, password: string) => {
+export const registerUser = async (
+  email: string,
+  password: string,
+  username: string,
+) => {
   var firebaseUser: any = null;
   await createUserWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
@@ -28,6 +33,19 @@ export const registerUser = async (email: string, password: string) => {
       const errorCode = error.code;
       const errorMessage = error.message;
       throw new Error(`Error registering user: ${errorCode} - ${errorMessage}`);
+    })
+    .finally(() => {
+      if (firebaseUser) {
+        updateProfile(firebaseUser, { displayName: username }).catch(
+          (error) => {
+            const errorCode = error.code;
+            const errorMessage = error.message;
+            throw new Error(
+              `Error updating user profile: ${errorCode} - ${errorMessage}`,
+            );
+          },
+        );
+      }
     });
   return new AppUser(firebaseUser);
 };

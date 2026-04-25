@@ -46,10 +46,7 @@ export const Header: FC<Props> = (props) => {
           </Button>
           {user ? (
             <>
-              <p>
-                Welcome,{" "}
-                {user?.firebaseUser?.displayName || user?.firebaseUser?.email}!
-              </p>
+              <p>Welcome, {user?.firebaseUser?.displayName}!</p>
               <Button
                 variant="outline"
                 rounded={"full"}
