@@ -109,14 +109,15 @@ export const RegisterForm: FC<Props> = ({ setOpen }) => {
         message: "An unexpected error occurred. Please try again.",
       });
       return;
+    } finally {
+      console.log("Registered user:", user);
+      login(user);
+      setFeedback({
+        status: "success",
+        message: "Account created successfully.",
+      });
+      setOpen(false);
     }
-    console.log("Registered user:", user);
-    login(user);
-    setFeedback({
-      status: "success",
-      message: "Account created successfully.",
-    });
-    setOpen(false);
   });
 
   const passwordValue = watch("password");

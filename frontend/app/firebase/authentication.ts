@@ -21,13 +21,6 @@ export const registerUser = async (
   await createUserWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
       firebaseUser = userCredential.user;
-      sendEmailVerification(firebaseUser).catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        throw new Error(
-          `Error sending email verification: ${errorCode} - ${errorMessage}`,
-        );
-      });
     })
     .catch((error) => {
       const errorCode = error.code;
@@ -45,8 +38,16 @@ export const registerUser = async (
             );
           },
         );
+        sendEmailVerification(firebaseUser).catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          throw new Error(
+            `Error sending email verification: ${errorCode} - ${errorMessage}`,
+          );
+        });
       }
     });
+  console.log("Registered user:", firebaseUser);
   return new AppUser(firebaseUser);
 };
 
