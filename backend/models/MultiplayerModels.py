@@ -52,6 +52,7 @@ class SubmitTurnRequest(BaseModel):
     question_type: QuestionType
     question_id: int = Field(gt=0)
     is_correct: bool
+    game_state: dict | None = None
 
 
 class SubmitTurnResponse(BaseModel):

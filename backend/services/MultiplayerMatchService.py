@@ -256,7 +256,7 @@ class MultiplayerMatchService:
                 "player1_elo_change": player1_delta,
                 "player2_elo_change": player2_delta,
                 "status": status,
-                "finished_at": datetime.now(timezone.utc),
+                "finished_at": datetime.utcnow(),
                 "match_id": match_id,
             },
         )

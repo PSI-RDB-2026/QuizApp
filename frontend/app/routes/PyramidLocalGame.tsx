@@ -10,7 +10,6 @@ import {
 import { useMemo, useState } from "react";
 
 import { TimerLine } from "components/General/TimerLine";
-import StandardQuestionModal from "../../components/StandardQuestionModal";
 import YesNoQuestionModal from "../../components/YesNoQuestionModal";
 import SwitchAnswerModal from "components/SwitchAnswerModal";
 import GameOverModal from "../../components/GameOverModal";
@@ -65,7 +64,7 @@ export default function PyramidLocalGame() {
   }, [pickSeconds]);
 
   return (
-    <Container maxW="7xl" py={6}>
+    <Container maxW="8xl" px={{ base: 3, md: 6 }} py={6}>
       <Stack gap={5}>
         <Flex justify="center" align="center" gap={3} flexWrap="wrap">
           <Box
@@ -90,15 +89,15 @@ export default function PyramidLocalGame() {
           </Box>
         </Flex>
 
-        <Box overflowX="hidden" py={2}>
+        <Box overflowX="clip" py={2}>
           <Stack align="center" gap={2}>
             {board.map((row, rowIndex) => (
               <Flex
                 key={`row-${rowIndex}`}
                 justify="center"
                 mt={rowIndex === 0 ? 0 : { base: "-10px", md: "-12px" }}
-                gap={{ base: 1.5, md: 2.5 }}
-                px={2}
+                gap={{ base: 1, sm: 1.25, md: 2.5 }}
+                px={0}
               >
                 {row.map((tile) => (
                   <HexTile
@@ -134,15 +133,15 @@ export default function PyramidLocalGame() {
 
       {activeChallenge ? (
         activeChallenge.questionType === "standard" ? (
-          <StandardQuestionModal
+          <SwitchAnswerModal
             key={`${phase}-${activeChallenge.question.id}`}
             open={phase === "answering" || phase === "stealing"}
             playerLabel={PLAYER_META[activeChallenge.answerPlayer].label}
-            question={activeChallenge.question}
+            questionType="standard"
             remainingSeconds={questionSeconds}
             totalSeconds={ANSWER_SECONDS}
-            mode={phase === "stealing" ? "steal" : "answer"}
-            onSubmit={handleAnswer}
+            onAccept={() => handleAnswer("accept")}
+            onDecline={() => handleAnswer("decline")}
           />
         ) : (
           <YesNoQuestionModal
@@ -236,8 +235,8 @@ function HexTile({ tile, disabled, onClick }: HexTileProps) {
     <Box
       as="button"
       position="relative"
-      width={{ base: "44px", sm: "46px", md: "66px" }}
-      height={{ base: "50px", sm: "52px", md: "74px" }}
+      width={{ base: "38px", sm: "42px", md: "66px" }}
+      height={{ base: "44px", sm: "48px", md: "74px" }}
       className="clip-hexagon"
       cursor={clickable ? "pointer" : "not-allowed"}
       opacity={disabled && !isClaimed(tile) ? 0.8 : 1}

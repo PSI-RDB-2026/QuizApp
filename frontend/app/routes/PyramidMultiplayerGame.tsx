@@ -103,6 +103,7 @@ export default function PyramidMultiplayerGame() {
     "Preparing matchmaking...",
   );
   const [syncStatusText, setSyncStatusText] = useState<string>("");
+  const [matchEndMessage, setMatchEndMessage] = useState<string>("");
   const [errorText, setErrorText] = useState<string>("");
   const [connectedPlayers, setConnectedPlayers] = useState<Set<string>>(
     new Set(),
@@ -112,6 +113,7 @@ export default function PyramidMultiplayerGame() {
   const socketRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<number | null>(null);
   const lastBroadcastSnapshotRef = useRef<string>("");
+  const [timersEnabled, setTimersEnabled] = useState(false);
 
   const {
     board,
@@ -133,6 +135,7 @@ export default function PyramidMultiplayerGame() {
   } = usePyramidGameController({
     initialTurnPlayer: "player1",
     externalSnapshot: remoteSnapshot,
+    timersEnabled,
     transport: {
       requestQuestion: async (questionType) => getQuestion(questionType),
       submitAnswerCheck: async (payload) => {
@@ -167,6 +170,11 @@ export default function PyramidMultiplayerGame() {
     },
   });
 
+  const hasClaimedTiles = useMemo(
+    () => board.some((row) => row.some((tile) => isClaimed(tile))),
+    [board],
+  );
+
   const mySide: Player | null = useMemo(() => {
     if (!match || !playerEmail) {
       return null;
@@ -194,6 +202,34 @@ export default function PyramidMultiplayerGame() {
       connectedPlayers.has(match.player2.email)
     );
   }, [connectedPlayers, match]);
+
+  const hasGameplayEvidence = useMemo(() => {
+    if (!match) {
+      return false;
+    }
+
+    return (
+      phase !== "idle" ||
+      hasClaimedTiles ||
+      match.player1_score > 0 ||
+      match.player2_score > 0 ||
+      remoteSnapshot !== null
+    );
+  }, [hasClaimedTiles, match, phase, remoteSnapshot]);
+
+  const multiplayerReady = bothPlayersConnected || hasGameplayEvidence;
+  const canControlCurrentTurn =
+    mySide !== null && isMyTurn && multiplayerReady && gameState === "playing";
+
+  useEffect(() => {
+    if (match?.id) {
+      setMatchEndMessage("");
+    }
+  }, [match?.id]);
+
+  useEffect(() => {
+    setTimersEnabled(canControlCurrentTurn);
+  }, [canControlCurrentTurn]);
 
   const pickPopupText =
     phase === "idle"
@@ -238,6 +274,10 @@ export default function PyramidMultiplayerGame() {
       return;
     }
 
+    if (!canControlCurrentTurn) {
+      return;
+    }
+
     const snapshotString = JSON.stringify(currentSnapshot);
     if (snapshotString === lastBroadcastSnapshotRef.current) {
       return;
@@ -250,7 +290,7 @@ export default function PyramidMultiplayerGame() {
         snapshot: currentSnapshot,
       }),
     );
-  }, [currentSnapshot]);
+  }, [currentSnapshot, canControlCurrentTurn]);
 
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
@@ -407,14 +447,8 @@ export default function PyramidMultiplayerGame() {
     ws.onopen = () => {
       setConnectedPlayers(new Set(playerEmail ? [playerEmail] : []));
       setSyncStatusText("Realtime connected.");
-      lastBroadcastSnapshotRef.current = JSON.stringify(currentSnapshot);
+      lastBroadcastSnapshotRef.current = "";
       ws.send(JSON.stringify({ type: "state_request" }));
-      ws.send(
-        JSON.stringify({
-          type: "game_snapshot",
-          snapshot: currentSnapshot,
-        }),
-      );
     };
 
     ws.onmessage = (event) => {
@@ -487,6 +521,33 @@ export default function PyramidMultiplayerGame() {
         }
 
         if (parsed.event === "match_finished") {
+          const finishedReason =
+            typeof parsed.payload.reason === "string"
+              ? parsed.payload.reason
+              : "";
+          const winnerEmail =
+            typeof parsed.payload.winner_email === "string"
+              ? parsed.payload.winner_email
+              : "";
+
+          if (
+            finishedReason === "forfeit" ||
+            finishedReason === "disconnect_timeout"
+          ) {
+            const forfeitedLabel =
+              winnerEmail && match
+                ? winnerEmail === match.player1.email
+                  ? match.player2.username
+                  : match.player1.username
+                : "The other player";
+
+            setMatchEndMessage(
+              finishedReason === "forfeit"
+                ? `${forfeitedLabel} forfeited the match.`
+                : `${forfeitedLabel} disconnected and lost the match.`,
+            );
+          }
+
           void refreshMatch();
         }
       } catch {
@@ -506,10 +567,6 @@ export default function PyramidMultiplayerGame() {
   }, [match?.id, token, playerEmail]);
 
   const handleAnswerIfAllowed = async (answer: string | boolean) => {
-    if (!bothPlayersConnected || !isMyTurn) {
-      return;
-    }
-
     await handleAnswer(answer);
   };
 
@@ -522,6 +579,13 @@ export default function PyramidMultiplayerGame() {
     const response = await forfeitMultiplayerMatch(token, match.id);
     if ("winner_email" in response) {
       setSyncStatusText("You forfeited the match.");
+      setMatchEndMessage(
+        `${
+          response.winner_email === match.player1.email
+            ? match.player1.username
+            : match.player2.username
+        } wins because the other player forfeited.`,
+      );
     } else {
       setSyncStatusText(
         response.detail || response.message || "Forfeit failed.",
@@ -610,7 +674,7 @@ export default function PyramidMultiplayerGame() {
           </Text>
         </HStack>
 
-        {!bothPlayersConnected ? (
+        {!multiplayerReady ? (
           <Text textAlign="center" fontSize="sm" color="orange.500">
             Waiting for both players to be connected before the game starts.
           </Text>
@@ -634,10 +698,14 @@ export default function PyramidMultiplayerGame() {
                       winner !== null ||
                       phase !== "idle" ||
                       !isMyTurn ||
-                      !bothPlayersConnected
+                      gameState !== "playing"
                     }
                     onClick={() => {
-                      if (bothPlayersConnected && isMyTurn) {
+                      if (
+                        isMyTurn &&
+                        phase === "idle" &&
+                        gameState === "playing"
+                      ) {
                         startSelection(tile.row, tile.col, tile);
                       }
                     }}
@@ -676,23 +744,25 @@ export default function PyramidMultiplayerGame() {
         activeChallenge.questionType === "standard" ? (
           <StandardQuestionModal
             key={`${phase}-${activeChallenge.question.id}`}
-            open={(phase === "answering" || phase === "stealing") && isMyTurn}
+            open={phase === "answering" || phase === "stealing"}
             playerLabel={PLAYER_META[activeChallenge.answerPlayer].label}
             question={activeChallenge.question}
             remainingSeconds={questionSeconds}
             totalSeconds={ANSWER_SECONDS}
             mode={phase === "stealing" ? "steal" : "answer"}
+            interactive={isMyTurn}
             onSubmit={handleAnswerIfAllowed}
           />
         ) : (
           <YesNoQuestionModal
             key={`${phase}-${activeChallenge.question.id}`}
-            open={(phase === "answering" || phase === "stealing") && isMyTurn}
+            open={phase === "answering" || phase === "stealing"}
             playerLabel={PLAYER_META[activeChallenge.answerPlayer].label}
             question={activeChallenge.question}
             remainingSeconds={questionSeconds}
             totalSeconds={ANSWER_SECONDS}
             mode={phase === "stealing" ? "steal" : "answer"}
+            interactive={isMyTurn}
             onSubmit={handleAnswerIfAllowed}
           />
         )
@@ -700,22 +770,19 @@ export default function PyramidMultiplayerGame() {
 
       {activeChallenge && phase === "switch" ? (
         <SwitchAnswerModal
-          open={phase === "switch" && isMyTurn}
+          open={phase === "switch"}
           playerLabel={
             PLAYER_META[otherPlayer(activeChallenge.ownerPlayer)].label
           }
           questionType={activeChallenge.questionType}
           remainingSeconds={switchSeconds}
           totalSeconds={ANSWER_SECONDS}
+          interactive={isMyTurn}
           onAccept={() => {
-            if (bothPlayersConnected && isMyTurn) {
-              openStealChallenge();
-            }
+            openStealChallenge();
           }}
           onDecline={() => {
-            if (bothPlayersConnected && isMyTurn) {
-              void revealCorrectAndContinue();
-            }
+            void revealCorrectAndContinue();
           }}
         />
       ) : null}
@@ -746,7 +813,7 @@ export default function PyramidMultiplayerGame() {
         }
         message={
           match.status !== "ongoing"
-            ? "Match finished."
+            ? matchEndMessage || "Match finished."
             : (gameResult?.message ?? "")
         }
         onHome={() => window.location.assign("/")}

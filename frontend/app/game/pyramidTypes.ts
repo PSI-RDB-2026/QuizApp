@@ -12,7 +12,7 @@ export interface TileCell {
   state: TileState;
 }
 
-export const BOARD_SIZE = 7;
+export const BOARD_SIZE = 8;
 
 export const PLAYER_META: Record<
   Player,

@@ -23,6 +23,7 @@ interface Props {
   remainingSeconds: number;
   totalSeconds: number;
   mode: Mode;
+  interactive?: boolean;
   onSubmit: (answer: boolean) => void | Promise<void>;
 }
 
@@ -33,6 +34,7 @@ export default function YesNoQuestionModal({
   remainingSeconds,
   totalSeconds,
   mode,
+  interactive = true,
   onSubmit,
 }: Props) {
   const [submitting, setSubmitting] = useState(false);
@@ -41,10 +43,13 @@ export default function YesNoQuestionModal({
     return Math.max((remainingSeconds / totalSeconds) * 100, 0);
   }, [remainingSeconds, totalSeconds]);
 
-  const accent = mode === "steal" ? "orange.500" : "blue.500";
   const banner = mode === "steal" ? "Steal chance" : "Answer now";
 
   const submit = async (answer: boolean) => {
+    if (!interactive) {
+      return;
+    }
+
     setSubmitting(true);
     await onSubmit(answer);
   };
@@ -63,6 +68,7 @@ export default function YesNoQuestionModal({
             color="fg"
             boxShadow="2xl"
             maxW="2xl"
+            w={{ base: "calc(100vw - 1.5rem)", md: "2xl" }}
           >
             <Box
               px={6}
@@ -73,7 +79,7 @@ export default function YesNoQuestionModal({
                   : "linear(to-r, blue.500, teal.500)"
               }
             >
-              <HStack justify="space-between" align="start">
+              <HStack justify="space-between" align="start" gap={4}>
                 <Stack gap={1}>
                   <Badge
                     colorPalette="whiteAlpha"
@@ -83,19 +89,19 @@ export default function YesNoQuestionModal({
                     {banner}
                   </Badge>
                   <Heading size="lg">Yes / No question</Heading>
-                  <Text color="fg">{playerLabel} can answer now.</Text>
-                </Stack>
-                <Box textAlign="right">
-                  <Text fontSize="2xl" fontWeight="bold">
-                    {remainingSeconds}s
+                  <Text color="whiteAlpha.900">
+                    {interactive
+                      ? `${playerLabel} can answer now.`
+                      : "Waiting for the active player."}
                   </Text>
-                  <Text fontSize="sm" color="fg.muted">
+                </Stack>
+                <Box w="140px" textAlign="right" flexShrink={0}>
+                  <TimerLine progress={progress} />
+                  <Text mt={2} fontSize="sm" color="whiteAlpha.900">
                     timer
                   </Text>
                 </Box>
               </HStack>
-
-              <TimerLine progress={progress} />
             </Box>
 
             <Box px={6} py={5}>
@@ -120,7 +126,7 @@ export default function YesNoQuestionModal({
                     colorPalette="green"
                     onClick={() => void submit(true)}
                     loading={submitting}
-                    disabled={submitting}
+                    disabled={submitting || !interactive}
                   >
                     Yes
                   </Button>
@@ -130,7 +136,7 @@ export default function YesNoQuestionModal({
                     colorPalette="red"
                     onClick={() => void submit(false)}
                     loading={submitting}
-                    disabled={submitting}
+                    disabled={submitting || !interactive}
                   >
                     No
                   </Button>

@@ -102,6 +102,7 @@ export interface SubmitTurnRequest {
   question_type: MultiplayerQuestionType;
   question_id: number;
   is_correct: boolean;
+  game_state?: Record<string, unknown>;
 }
 
 export interface SubmitTurnResponse {
@@ -373,6 +374,24 @@ export const forfeitMultiplayerMatch = async (
     return response.data as ForfeitResponse;
   } catch (error: unknown) {
     console.error("Error forfeiting multiplayer match:", error);
+    return unwrapError(error, { message: "Unknown error" });
+  }
+};
+
+export const syncMultiplayerGameState = async (
+  token: string,
+  matchId: number,
+  gameState: Record<string, unknown>,
+): Promise<{ status: string } | ApiErrorResponse> => {
+  try {
+    const response = await axios.post(
+      `${apiUrl}/multiplayer/matches/${matchId}/sync-game-state`,
+      { game_state: gameState },
+      authHeaders(token),
+    );
+    return response.data as { status: string };
+  } catch (error: unknown) {
+    console.error("Error syncing multiplayer game state:", error);
     return unwrapError(error, { message: "Unknown error" });
   }
 };

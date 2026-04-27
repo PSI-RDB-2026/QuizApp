@@ -1,10 +1,9 @@
 //import { Gamepad2 } from "lucide-react";
 import { Box, Button, Heading, Icon, Text } from "@chakra-ui/react";
 import { useColorModeValue } from "app/components/ui/color-mode";
-import { memo } from "react";
 import type { FC } from "react";
 import { LuGamepad2 } from "react-icons/lu";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 
 interface Props {
   title: string;
@@ -26,7 +25,6 @@ export const GameModeCard: FC<Props> = ({
       onClick={() => navigate(navigateTo)}
       className="group"
       variant="ghost"
-      style={{}}
       _hover={{
         boxShadow: "2xl",
         transform: "translateY(-2px)",
@@ -34,7 +32,8 @@ export const GameModeCard: FC<Props> = ({
       display="flex"
       flexDirection="column"
       alignItems="center"
-      width={{ base: "100%", md: "48%" }}
+      flex={{ base: "1 1 auto", md: "1 1 360px" }}
+      width="full"
       maxWidth={{ base: "100%", md: "560px" }}
       minHeight={{ base: "300px", md: "360px" }}
       height={"full"}

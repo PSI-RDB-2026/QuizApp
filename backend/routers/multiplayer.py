@@ -157,6 +157,15 @@ async def submit_turn(
             "is_correct": payload.is_correct,
         },
     )
+
+    if payload.game_state:
+        MultiplayerRealtimeService.set_snapshot(match_id, payload.game_state)
+        await MultiplayerRealtimeService.broadcast(
+            match_id,
+            "game_snapshot",
+            {"snapshot": payload.game_state},
+        )
+
     return SubmitTurnResponse(**turn_result)
 
 

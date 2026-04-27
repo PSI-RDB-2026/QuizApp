@@ -55,6 +55,7 @@ interface UsePyramidGameControllerOptions {
   transport?: GameTransport;
   initialTurnPlayer?: Player;
   externalSnapshot?: PyramidGameSnapshot | null;
+  timersEnabled?: boolean;
 }
 
 export function usePyramidGameController(
@@ -62,6 +63,7 @@ export function usePyramidGameController(
 ) {
   const transport = options?.transport ?? localGameTransport;
   const openingPlayer = options?.initialTurnPlayer;
+  const timersEnabled = options?.timersEnabled ?? true;
   const [board, setBoard] = useState<TileCell[][]>(() => createBoard());
   const [turnPlayer, setTurnPlayer] = useState<Player>(
     () => openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2"),
@@ -136,6 +138,10 @@ export function usePyramidGameController(
   };
 
   useEffect(() => {
+    if (!timersEnabled) {
+      return;
+    }
+
     if (winner || gameState !== "playing" || phase !== "idle") {
       return;
     }
@@ -154,7 +160,7 @@ export function usePyramidGameController(
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [pickSeconds, phase, turnPlayer, winner, gameState]);
+  }, [pickSeconds, phase, turnPlayer, winner, gameState, timersEnabled]);
 
   const endChallenge = (nextTurn: Player) => {
     setTurnPlayer(nextTurn);
@@ -371,6 +377,10 @@ export function usePyramidGameController(
   };
 
   useEffect(() => {
+    if (!timersEnabled) {
+      return;
+    }
+
     if (
       gameState !== "playing" ||
       (phase !== "answering" && phase !== "stealing" && phase !== "switch")
@@ -401,7 +411,7 @@ export function usePyramidGameController(
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [phase, questionSeconds, switchSeconds, gameState]);
+  }, [phase, questionSeconds, switchSeconds, gameState, timersEnabled]);
 
   const concedeCurrentTurn = () => {
     const winnerPlayer = otherPlayer(turnPlayer);
