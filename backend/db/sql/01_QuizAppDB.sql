@@ -65,15 +65,15 @@ COMMENT ON COLUMN "match_turns"."standard_question_id" IS 'Null if a Yes/No ques
 
 COMMENT ON COLUMN "match_turns"."yes_no_question_id" IS 'Null if a standard question was used';
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("player1_id") REFERENCES "users" ("email");
+ALTER TABLE "matches" ADD FOREIGN KEY ("player1_id") REFERENCES "users" ("firebase_uid");
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("player2_id") REFERENCES "users" ("email");
+ALTER TABLE "matches" ADD FOREIGN KEY ("player2_id") REFERENCES "users" ("firebase_uid");
 
-ALTER TABLE "matches" ADD FOREIGN KEY ("winner_id") REFERENCES "users" ("email");
+ALTER TABLE "matches" ADD FOREIGN KEY ("winner_id") REFERENCES "users" ("firebase_uid");
 
 ALTER TABLE "match_turns" ADD FOREIGN KEY ("match_id") REFERENCES "matches" ("id");
 
-ALTER TABLE "match_turns" ADD FOREIGN KEY ("player_id") REFERENCES "users" ("email");
+ALTER TABLE "match_turns" ADD FOREIGN KEY ("player_id") REFERENCES "users" ("firebase_uid");
 
 ALTER TABLE "match_turns" ADD FOREIGN KEY ("standard_question_id") REFERENCES "standard_questions" ("id");
 

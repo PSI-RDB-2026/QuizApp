@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 @dataclass
 class QueueEntry:
-    email: str
+    uid: str
     username: str
     elo_rating: int
     game_mode: str
@@ -42,19 +42,19 @@ class MatchmakingService:
 
     @staticmethod
     async def join_or_match(
-        email: str,
+        uid: str,
         username: str,
         elo_rating: int,
         game_mode: str,
     ) -> MatchmakingResult:
         async with MatchmakingService._lock:
             MatchmakingService._queue = [
-                entry for entry in MatchmakingService._queue if entry.email != email
+                entry for entry in MatchmakingService._queue if entry.uid != uid
             ]
 
             now = datetime.now(timezone.utc)
             new_entry = QueueEntry(
-                email=email,
+                uid=uid,
                 username=username,
                 elo_rating=elo_rating,
                 game_mode=game_mode,
@@ -74,7 +74,7 @@ class MatchmakingService:
             if candidates:
                 opponent = min(candidates, key=lambda entry: entry.joined_at)
                 MatchmakingService._queue = [
-                    entry for entry in MatchmakingService._queue if entry.email != opponent.email
+                    entry for entry in MatchmakingService._queue if entry.uid != opponent.uid
                 ]
                 return MatchmakingResult(
                     status="matched",
@@ -93,19 +93,19 @@ class MatchmakingService:
             )
 
     @staticmethod
-    async def leave_queue(email: str) -> bool:
+    async def leave_queue(uid: str) -> bool:
         async with MatchmakingService._lock:
             old_count = len(MatchmakingService._queue)
             MatchmakingService._queue = [
-                entry for entry in MatchmakingService._queue if entry.email != email
+                entry for entry in MatchmakingService._queue if entry.uid != uid
             ]
             return len(MatchmakingService._queue) < old_count
 
     @staticmethod
-    async def get_queue_status(email: str):
+    async def get_queue_status(uid: str):
         async with MatchmakingService._lock:
             for index, entry in enumerate(MatchmakingService._queue, start=1):
-                if entry.email == email:
+                if entry.uid == uid:
                     now = datetime.now(timezone.utc)
                     waited_seconds = int((now - entry.joined_at).total_seconds())
                     return {

@@ -1,195 +1,124 @@
-from datetime import datetime, timedelta
 import logging
-import jwt
-import os
-from models.UserModels import RegisterRequest
-from argon2 import PasswordHasher
-from argon2.exceptions import VerificationError
+
+from firebase_admin import auth
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
-from db.database import execute, fetch_one, fetch_all
 
-ALGORITHM = "HS256"
-JWT_EXPIRE_MINUTES = 60
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in os.sys.path:
-    os.sys.path.append(current_dir)
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your_secret_key_here")
+from models.UserModels import RegisterRequest
+from db.database import execute, fetch_one
 
-password_hasher = PasswordHasher()
 logger = logging.getLogger(__name__)
 
 
 class UserServices:
-    '''
-    This is a simple in-memory user service. In a real application, 
-    you would likely use a database.
-    '''
-    USERS = {
-        "test_user": {
-            "username": "test_user",
-            "password": password_hasher.hash("moje_heslo_123"),
-            "email": "test@example.com"
-        }
-    }
+    """User data access and token-backed user resolution."""
 
     @staticmethod
-    def verify_password(hashed_password: str, plain_password: str) -> bool:
-        """Function for verifying users"""
-        try:
-            return password_hasher.verify(hashed_password, plain_password)
-        except VerificationError:
-            return False
-        except Exception:
-            return False
+    def _row_to_dict(row) -> dict | None:
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return row
+        if hasattr(row, "_mapping"):
+            return dict(row._mapping)
+        return dict(row)
 
     @staticmethod
-    async def authenticate_user(email: str, password: str) -> bool:
-        '''Authenticate the user by checking the email and password.'''
-        user = await UserServices.get_user(email)
-        if not user:
-            logger.warning("authentication_failed_user_not_found", extra={"email": email})
-            return False
-        if not UserServices.verify_password(user["password"], password):
-            logger.warning("authentication_failed_invalid_password", extra={"email": email})
-            return False
-        logger.info("authentication_succeeded", extra={"email": email})
-        return True
-
-    @staticmethod
-    async def get_user(email: str):
-        '''Get user details by email.
-        Returns None if the user does not exist.'''
+    async def get_user(uid: str) -> dict | None:
+        """Get user details by Firebase UID, or None if not found."""
         try:
             user = await fetch_one(
                 """
-                SELECT username, password_hash AS password, email
+                SELECT firebase_uid AS uid, username, elo_rating
                 FROM users
-                WHERE email = :email
+                WHERE firebase_uid = :uid
                 """,
-                {"email": email}
+                {"uid": uid},
             )
-            logger.debug("user_fetched", extra={"email": email, "found": user is not None})
-            return user._mapping if user else None
-        except Exception:
-            logger.exception("error_fetching_user", extra={"email": email})
-            raise HTTPException(status_code=500, detail="Could not fetch user.")
-
-    @staticmethod
-    async def create_access_token(
-        data: dict,
-        expires_delta: timedelta | None = None
-    ) -> str:
-        '''Create a JWT access token with
-        the given data and expiration time.'''
-        to_encode = data.copy()
-
-        if expires_delta:
-            expire = datetime.now() + expires_delta
-        else:
-            expire = datetime.now() + timedelta(minutes=JWT_EXPIRE_MINUTES)
-
-        to_encode.update({"exp": expire})
-
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-        logger.debug("access_token_created", extra={"email": data.get("email")})
-        return encoded_jwt
-
-    @staticmethod
-    async def get_user_from_token(token: str):
-        """Function for getting code from user token (JWT)"""
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
-        email = decoded["email"]
-        try:
-            user = await fetch_one(
-                """
-                SELECT username, email
-                FROM users
-                WHERE email = :email
-                """,
-                {"email": email}
-            )
-            logger.debug("user_fetched_from_token", extra={"email": email, "found": user is not None})
-        except Exception:
-            logger.exception("error_fetching_user_from_token", extra={"email": email})
-            raise HTTPException(status_code=500, detail="Could not fetch user.")
-        return user if user else None
+            logger.debug("user_fetched", extra={"uid": uid, "found": user is not None})
+            return UserServices._row_to_dict(user)
+        except Exception as exc:
+            logger.exception("error_fetching_user", extra={"uid": uid})
+            raise HTTPException(status_code=500, detail="Could not fetch user.") from exc
 
     @staticmethod
     async def create_user(user: RegisterRequest) -> dict:
-        """Function for create new user in memory"""
-        new_user = {
-            "username": user.username,
-            "password": password_hasher.hash(user.password),
-            "email": user.email
-        }
-        logger.info("user_creation_started", extra={"username": user.username, "email": user.email})
-        crete_user_query = """
-        INSERT INTO users (username, password_hash, email)
-        VALUES (:username, :password, :email)
+        """Create user row for a Firebase-authenticated user."""
+        new_user = {"uid": user.uid, "username": user.username}
+        logger.info(
+            "user_creation_started",
+            extra={"uid": user.uid, "username": user.username},
+        )
+        create_user_query = """
+        INSERT INTO users (firebase_uid, username)
+        VALUES (:uid, :username)
         """
         try:
-            await execute(crete_user_query, new_user)
+            await execute(create_user_query, new_user)
         except IntegrityError as e:
             error_text = str(getattr(e, "orig", e)).lower()
-            if "key (email)" in error_text or "users_pkey" in error_text:
+            if "users_pkey" in error_text or "firebase_uid" in error_text:
                 logger.warning(
-                    "user_creation_duplicate_email",
-                    extra={"username": user.username, "email": user.email},
+                    "user_creation_duplicate_uid",
+                    extra={"uid": user.uid, "username": user.username},
                 )
-                raise HTTPException(status_code=409, detail="Email already exists.")
+                raise HTTPException(status_code=409, detail="User already exists.") from e
 
             if "key (username)" in error_text or "users_username_key" in error_text:
                 logger.warning(
                     "user_creation_duplicate_username",
-                    extra={"username": user.username, "email": user.email},
+                    extra={"uid": user.uid, "username": user.username},
                 )
-                raise HTTPException(status_code=409, detail="Username already exists.")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Username already exists.",
+                ) from e
 
             logger.exception(
                 "user_creation_integrity_error",
-                extra={"username": user.username, "email": user.email},
+                extra={"uid": user.uid, "username": user.username},
             )
-            raise HTTPException(status_code=500, detail="Could not create user.")
-        except Exception:
+            raise HTTPException(status_code=500, detail="Could not create user.") from e
+        except Exception as exc:
             logger.exception(
                 "user_creation_failed",
-                extra={"username": user.username, "email": user.email},
+                extra={"uid": user.uid, "username": user.username},
             )
-            raise HTTPException(status_code=500, detail="Could not create user.")
+            raise HTTPException(status_code=500, detail="Could not create user.") from exc
 
         user_from_db = await fetch_one(
             """
-            SELECT username, email
+            SELECT firebase_uid AS uid, username, elo_rating
             FROM users
-            WHERE username = :username
+            WHERE firebase_uid = :uid
             """,
-            {"username": user.username}
+            {"uid": user.uid},
         )
         if user_from_db is None:
             logger.error(
                 "user_created_but_not_fetchable",
-                extra={"username": user.username, "email": user.email},
+                extra={"uid": user.uid, "username": user.username},
             )
             raise HTTPException(status_code=500, detail="Could not create user.")
 
-        user_from_db = user_from_db._mapping
-        logger.info("user_created", extra={"username": user_from_db["username"], "email": user_from_db["email"]})
-        return {
-            "username": user_from_db["username"],
-            "email": user_from_db["email"]
-        }
+        created_user = UserServices._row_to_dict(user_from_db)
+        logger.info(
+            "user_created",
+            extra={"uid": created_user["uid"], "username": created_user["username"]},
+        )
+        return created_user
 
     @staticmethod
-    async def delete_user(user_name: str):
-        """Function for delete user"""
-        delete_user_query = """
-        DELETE FROM users
-        WHERE username = :username
-        """
+    async def get_user_from_token(token: str) -> dict:
+        """Verify Firebase token and return user profile stored in DB."""
         try:
-            await execute(delete_user_query, {"username": user_name})
-            logger.info("user_deleted", extra={"username": user_name})
-        except Exception as e:
-            logger.exception("error_deleting_user", extra={"username": user_name})
-            raise HTTPException(status_code=404, detail="Uživatel nenalezen.")
+            decoded_token = auth.verify_id_token(token)
+            uid = decoded_token["uid"]
+        except Exception as exc:
+            logger.warning("token_verification_failed", extra={"error": str(exc)})
+            raise HTTPException(status_code=401, detail="Invalid token") from exc
+
+        user = await UserServices.get_user(uid)
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found in database.")
+        return user

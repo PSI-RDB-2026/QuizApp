@@ -27,9 +27,9 @@ export const registerUser = async (
       const errorMessage = error.message;
       throw new Error(`Error registering user: ${errorCode} - ${errorMessage}`);
     })
-    .finally(() => {
+    .finally(async () => {
       if (firebaseUser) {
-        updateProfile(firebaseUser, { displayName: username }).catch(
+        await updateProfile(firebaseUser, { displayName: username }).catch(
           (error) => {
             const errorCode = error.code;
             const errorMessage = error.message;
@@ -38,7 +38,7 @@ export const registerUser = async (
             );
           },
         );
-        sendEmailVerification(firebaseUser).catch((error) => {
+        await sendEmailVerification(firebaseUser).catch((error) => {
           const errorCode = error.code;
           const errorMessage = error.message;
           throw new Error(

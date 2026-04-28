@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS yes_no_questions (
 
 CREATE TABLE IF NOT EXISTS matches (
   id BIGSERIAL PRIMARY KEY,
-  player1_id varchar NOT NULL REFERENCES users (email),
-  player2_id varchar NOT NULL REFERENCES users (email),
-  winner_id varchar REFERENCES users (email),
+  player1_id varchar NOT NULL REFERENCES users (firebase_uid),
+  player2_id varchar NOT NULL REFERENCES users (firebase_uid),
+  winner_id varchar REFERENCES users (firebase_uid),
   player1_elo_change int,
   player2_elo_change int,
   status varchar NOT NULL DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'completed', 'aborted')),
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS matches (
 CREATE TABLE IF NOT EXISTS match_turns (
   id BIGSERIAL PRIMARY KEY,
   match_id bigint NOT NULL REFERENCES matches (id),
-  player_id varchar NOT NULL REFERENCES users (email),
+  player_id varchar NOT NULL REFERENCES users (firebase_uid),
   tile_id int NOT NULL,
   standard_question_id int REFERENCES standard_questions (id),
   yes_no_question_id int REFERENCES yes_no_questions (id),
