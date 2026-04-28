@@ -187,7 +187,7 @@ export default function PyramidLocalGame() {
         open={gameState === "ended" && gameResult !== null}
         winnerLabel={gameResult ? PLAYER_META[gameResult.winner].label : ""}
         message={gameResult?.message ?? ""}
-        onHome={() => window.location.assign("/")}
+        onHome={() => navigate("/")}
         onNewGame={startNewGame}
       />
     </Container>

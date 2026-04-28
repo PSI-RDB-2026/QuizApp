@@ -12,14 +12,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import {
-  checkQuestion,
   forfeitMultiplayerMatch,
-  getQuestion,
   getMultiplayerMatch,
   getMultiplayerQueueStatus,
   getMultiplayerWebSocketUrl,
   joinMultiplayerQueue,
-  submitMultiplayerTurn,
   type ApiErrorResponse,
   type MatchStateResponse,
   type MultiplayerWebSocketEvent,
@@ -28,6 +25,7 @@ import type { Route } from "./+types/PyramidMultiplayerGame";
 import ConcedeConfirmModal from "components/ConcedeConfirmModal";
 import { TimerLine } from "components/General/TimerLine";
 import GameOverModal from "components/GameOverModal";
+import { createWebsocketGameTransport } from "app/game/websocketGameTransport";
 import StandardQuestionModal from "components/StandardQuestionModal";
 import SwitchAnswerModal from "components/SwitchAnswerModal";
 import YesNoQuestionModal from "components/YesNoQuestionModal";
@@ -114,6 +112,8 @@ export default function PyramidMultiplayerGame() {
   const intervalRef = useRef<number | null>(null);
   const lastBroadcastSnapshotRef = useRef<string>("");
   const [timersEnabled, setTimersEnabled] = useState(false);
+  const websocketUrl =
+    match && token ? getMultiplayerWebSocketUrl(match.id, token) : "";
 
   const {
     board,
@@ -136,38 +136,26 @@ export default function PyramidMultiplayerGame() {
     initialTurnPlayer: "player1",
     externalSnapshot: remoteSnapshot,
     timersEnabled,
-    transport: {
-      requestQuestion: async (questionType) => getQuestion(questionType),
-      submitAnswerCheck: async (payload) => {
-        const result = await checkQuestion(payload);
-
-        if (!match || !token || payload.answer === "" || !activeChallenge) {
-          return result;
+    debugLogging: true,
+    transport: createWebsocketGameTransport({
+      endpoint: websocketUrl,
+      getTurnContext: () => {
+        if (!match || !token || !activeChallenge) {
+          return null;
         }
 
-        try {
-          await submitMultiplayerTurn(token, match.id, {
-            tile_id:
-              (activeChallenge.row * (activeChallenge.row + 1)) / 2 +
-              activeChallenge.col +
-              1,
-            question_type: activeChallenge.questionType,
-            question_id: payload.question_id,
-            is_correct: Boolean(result?.is_correct),
-          });
-          setSyncStatusText("Turn synced with server.");
-        } catch (error: unknown) {
-          const payloadError = error as ApiErrorResponse;
-          setSyncStatusText(
-            payloadError?.detail?.toString() ||
-              payloadError?.message?.toString() ||
-              "Could not sync turn.",
-          );
-        }
-
-        return result;
+        return {
+          token,
+          matchId: match.id,
+          tileId:
+            (activeChallenge.row * (activeChallenge.row + 1)) / 2 +
+            activeChallenge.col +
+            1,
+          questionType: activeChallenge.questionType,
+        };
       },
-    },
+      onSyncStatusText: setSyncStatusText,
+    }),
   });
 
   const hasClaimedTiles = useMemo(
@@ -269,28 +257,45 @@ export default function PyramidMultiplayerGame() {
     ],
   );
 
+  const broadcastSnapshotKey = useMemo(() => {
+    return JSON.stringify({
+      board,
+      turnPlayer,
+      winner,
+      gameState,
+      gameResult,
+      phase,
+      statusPopup,
+      activeChallenge,
+    });
+  }, [
+    activeChallenge,
+    board,
+    gameResult,
+    gameState,
+    phase,
+    statusPopup,
+    turnPlayer,
+    winner,
+  ]);
+
   useEffect(() => {
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    if (!canControlCurrentTurn) {
+    if (broadcastSnapshotKey === lastBroadcastSnapshotRef.current) {
       return;
     }
 
-    const snapshotString = JSON.stringify(currentSnapshot);
-    if (snapshotString === lastBroadcastSnapshotRef.current) {
-      return;
-    }
-
-    lastBroadcastSnapshotRef.current = snapshotString;
+    lastBroadcastSnapshotRef.current = broadcastSnapshotKey;
     socketRef.current.send(
       JSON.stringify({
         type: "game_snapshot",
         snapshot: currentSnapshot,
       }),
     );
-  }, [currentSnapshot, canControlCurrentTurn]);
+  }, [broadcastSnapshotKey, currentSnapshot]);
 
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
@@ -477,7 +482,16 @@ export default function PyramidMultiplayerGame() {
             | PyramidGameSnapshot
             | undefined;
           if (snapshot) {
-            lastBroadcastSnapshotRef.current = JSON.stringify(snapshot);
+            lastBroadcastSnapshotRef.current = JSON.stringify({
+              board: snapshot.board,
+              turnPlayer: snapshot.turnPlayer,
+              winner: snapshot.winner,
+              gameState: snapshot.gameState,
+              gameResult: snapshot.gameResult,
+              phase: snapshot.phase,
+              statusPopup: snapshot.statusPopup,
+              activeChallenge: snapshot.activeChallenge,
+            });
             setRemoteSnapshot(snapshot);
           }
           return;

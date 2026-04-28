@@ -47,6 +47,32 @@ export interface PyramidGameSnapshot {
   activeChallenge: ActiveChallenge | null;
 }
 
+export function logPyramidGameState(
+  snapshot: PyramidGameSnapshot,
+  label = "PyramidGame",
+) {
+  console.log(`[${label}]`, {
+    phase: snapshot.phase,
+    gameState: snapshot.gameState,
+    turnPlayer: snapshot.turnPlayer,
+    winner: snapshot.winner,
+    pickSeconds: snapshot.pickSeconds,
+    questionSeconds: snapshot.questionSeconds,
+    switchSeconds: snapshot.switchSeconds,
+    statusPopup: snapshot.statusPopup,
+    activeChallenge: snapshot.activeChallenge
+      ? {
+          row: snapshot.activeChallenge.row,
+          col: snapshot.activeChallenge.col,
+          ownerPlayer: snapshot.activeChallenge.ownerPlayer,
+          answerPlayer: snapshot.activeChallenge.answerPlayer,
+          questionType: snapshot.activeChallenge.questionType,
+          questionId: snapshot.activeChallenge.question.id,
+        }
+      : null,
+  });
+}
+
 export const PICK_SECONDS = 10;
 export const ANSWER_SECONDS = 18;
 const ANSWER_REVEAL_MS = 2200;
@@ -56,6 +82,7 @@ interface UsePyramidGameControllerOptions {
   initialTurnPlayer?: Player;
   externalSnapshot?: PyramidGameSnapshot | null;
   timersEnabled?: boolean;
+  debugLogging?: boolean;
 }
 
 export function usePyramidGameController(
@@ -64,6 +91,7 @@ export function usePyramidGameController(
   const transport = options?.transport ?? localGameTransport;
   const openingPlayer = options?.initialTurnPlayer;
   const timersEnabled = options?.timersEnabled ?? true;
+  const debugLogging = options?.debugLogging ?? false;
   const [board, setBoard] = useState<TileCell[][]>(() => createBoard());
   const [turnPlayer, setTurnPlayer] = useState<Player>(
     () => openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2"),
@@ -86,6 +114,8 @@ export function usePyramidGameController(
       return;
     }
 
+    // Sync the full shared game snapshot so both players stay aligned on the
+    // current phase, timers, question, and board state.
     setBoard(snapshot.board);
     setTurnPlayer(snapshot.turnPlayer);
     setWinner(snapshot.winner);
@@ -98,6 +128,42 @@ export function usePyramidGameController(
     setStatusPopup(snapshot.statusPopup);
     setActiveChallenge(snapshot.activeChallenge);
   }, [options?.externalSnapshot]);
+
+  useEffect(() => {
+    if (!debugLogging) {
+      return;
+    }
+
+    logPyramidGameState(
+      {
+        board,
+        turnPlayer,
+        winner,
+        gameState,
+        gameResult,
+        phase,
+        pickSeconds,
+        questionSeconds,
+        switchSeconds,
+        statusPopup,
+        activeChallenge,
+      },
+      "PyramidGameState",
+    );
+  }, [
+    activeChallenge,
+    board,
+    debugLogging,
+    gameResult,
+    gameState,
+    phase,
+    pickSeconds,
+    questionSeconds,
+    statusPopup,
+    switchSeconds,
+    turnPlayer,
+    winner,
+  ]);
 
   const startNewGame = () => {
     const nextOpeningPlayer =

@@ -1,3 +1,4 @@
+import type { QuestionType } from "app/game/pyramidTypes";
 import axios from "axios";
 
 import type { AxiosResponse } from "axios";
@@ -24,7 +25,12 @@ export interface UserInfoResponse {
   username: string;
   email: string;
 }
-
+export interface MultiplayerTurnContext {
+  token: string;
+  matchId: number;
+  tileId: number;
+  questionType: QuestionType;
+}
 export interface QuestionResponse {
   id: number;
   question_type: "standard" | "yes_no";
