@@ -1,7 +1,7 @@
 CREATE TABLE "users" (
   "firebase_uid" varchar PRIMARY KEY,
   "username" varchar UNIQUE NOT NULL,
-  "elo_rating" int DEFAULT 1200,
+  "elo_rating" int DEFAULT 1200
 );
 
 CREATE TABLE "standard_questions" (

@@ -1,10 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
-  email varchar PRIMARY KEY,
+  firebase_uid varchar PRIMARY KEY,
   username varchar UNIQUE NOT NULL,
-  password_hash varchar,
-  google_id varchar,
-  elo_rating int DEFAULT 1200,
-  created_at timestamp DEFAULT (now())
+  elo_rating int DEFAULT 1200
 );
 
 CREATE TABLE IF NOT EXISTS standard_questions (
