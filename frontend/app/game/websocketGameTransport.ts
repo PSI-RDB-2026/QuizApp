@@ -7,7 +7,7 @@ import type {
 } from "api/api";
 import { checkQuestion, getQuestion, submitMultiplayerTurn } from "api/api";
 import type { GameTransport } from "./gameTransport";
-import type { QuestionType } from "./pyramidTypes";
+import type { QuestionType } from "./pyramidTypesMultiplayer";
 
 interface WebsocketTransportOptions {
   endpoint: string;

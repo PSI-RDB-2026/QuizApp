@@ -1,4 +1,4 @@
-import type { QuestionType } from "app/game/pyramidTypes";
+import type { QuestionType } from "app/game/pyramidTypesMultiplayer";
 import axios from "axios";
 
 import type { AxiosResponse } from "axios";

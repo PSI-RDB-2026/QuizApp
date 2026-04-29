@@ -1,4 +1,3 @@
-
 export type Player = "player1" | "player2";
 export type TileState = "neutral" | "black" | Player;
 export type QuestionType = "standard" | "yes_no";
@@ -13,7 +12,7 @@ export interface TileCell {
   state: TileState;
 }
 
-export const BOARD_SIZE = 7;
+export const BOARD_SIZE = 8;
 
 export const PLAYER_META: Record<
   Player,

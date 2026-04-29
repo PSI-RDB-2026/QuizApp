@@ -10,14 +10,14 @@ import {
   type QuestionType,
   type TileCell,
   type TileState,
-} from "./pyramidTypes";
+} from "./pyramidTypesMultiplayer";
 import {
   createBoard,
   hasPotentialThreeSideConnection,
   otherPlayer,
   questionTypeForTile,
   touchesAllSides,
-} from "./pyramidRules";
+} from "./pyramidRulesMultiplayer";
 
 export interface ActiveChallenge {
   row: number;

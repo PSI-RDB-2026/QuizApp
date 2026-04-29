@@ -3,7 +3,7 @@ import {
   type Player,
   type QuestionType,
   type TileCell,
-} from "./pyramidTypes";
+} from "./pyramidTypesMultiplayer";
 
 export function otherPlayer(player: Player): Player {
   return player === "player1" ? "player2" : "player1";

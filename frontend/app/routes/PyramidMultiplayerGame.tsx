@@ -29,14 +29,18 @@ import { createWebsocketGameTransport } from "app/game/websocketGameTransport";
 import StandardQuestionModal from "components/StandardQuestionModal";
 import SwitchAnswerModal from "components/SwitchAnswerModal";
 import YesNoQuestionModal from "components/YesNoQuestionModal";
-import { isClaimed, otherPlayer } from "app/game/pyramidRules";
+import { isClaimed, otherPlayer } from "app/game/pyramidRulesMultiplayer";
 import {
   ANSWER_SECONDS,
   PICK_SECONDS,
   type PyramidGameSnapshot,
   usePyramidGameController,
 } from "app/game/usePyramidGameController";
-import { PLAYER_META, type Player, type TileCell } from "app/game/pyramidTypes";
+import {
+  PLAYER_META,
+  type Player,
+  type TileCell,
+} from "app/game/pyramidTypesMultiplayer";
 
 function isMatchStateResponse(value: unknown): value is MatchStateResponse {
   return (
@@ -800,14 +804,7 @@ export default function PyramidMultiplayerGame() {
   return (
     <Container maxW="7xl" py={6}>
       <Stack gap={5}>
-        <Button
-          alignSelf="start"
-          onClick={() => navigate("/")}
-          variant="surface"
-          colorPalette="green"
-        >
-          &larr; Back to Main Menu
-        </Button>
+
 
         <Flex justify="center" align="center" gap={3} flexWrap="wrap">
           <Box

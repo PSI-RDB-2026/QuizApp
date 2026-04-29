@@ -8,7 +8,9 @@ import {
 import type { QuestionType } from "./pyramidTypes";
 
 export interface GameTransport {
-  requestQuestion: (questionType: QuestionType) => Promise<QuestionResponse | null>;
+  requestQuestion: (
+    questionType: QuestionType,
+  ) => Promise<QuestionResponse | null>;
   submitAnswerCheck: (
     payload: CheckQuestionRequest,
   ) => Promise<CheckQuestionResponse | null>;
