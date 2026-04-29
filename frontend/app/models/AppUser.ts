@@ -13,6 +13,10 @@ export class AppUser {
     );
   }
 
+  async getAccessToken(): Promise<string> {
+    return await this.firebaseUser.getIdToken(true);
+  }
+
   accessToken(): string {
     return this.firebaseUser.accessToken || "null";
   }

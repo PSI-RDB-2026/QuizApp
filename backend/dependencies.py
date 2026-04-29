@@ -42,7 +42,7 @@ def _verify_firebase_token(id_token: str) -> str:
         )
 
     try:
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = auth.verify_id_token(id_token, clock_skew_seconds=10)
         user_id = decoded_token["uid"]
         logger.info("token_verified", extra={"user_id": user_id})
         return user_id

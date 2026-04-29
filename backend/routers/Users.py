@@ -40,3 +40,15 @@ async def get_user_info(
         "username": user["username"],
         "elo_rating": user["elo_rating"],
     })
+
+
+@router.post("/login")
+async def login_user(username: str, uid: str = Depends(get_firebase_id)):
+    """Login Firebase-authenticated user by checking local DB."""
+    user = await UserServices.get_user(uid)
+    if user is None:
+        await UserServices.create_user(RegisterRequest(username=username, uid=uid))
+        logger.info("login_succeeded_new_user", extra={"uid": uid, "username": username})
+    else:
+        logger.info("login_succeeded", extra={"uid": user["uid"], "username": user["username"]})
+    return Response(status_code=200)

@@ -112,7 +112,7 @@ class UserServices:
     async def get_user_from_token(token: str) -> dict:
         """Verify Firebase token and return user profile stored in DB."""
         try:
-            decoded_token = auth.verify_id_token(token)
+            decoded_token = auth.verify_id_token(token, clock_skew_seconds=10)
             uid = decoded_token["uid"]
         except Exception as exc:
             logger.warning("token_verification_failed", extra={"error": str(exc)})
