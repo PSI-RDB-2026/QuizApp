@@ -40,10 +40,6 @@ export interface QuestionResponse {
   difficulty?: number | null;
 }
 
-export interface QuestionInitialsResponse {
-  initials: string[];
-}
-
 export interface CheckQuestionRequest {
   question_id: number;
   answer: string | boolean;
@@ -256,16 +252,6 @@ export const getQuestion = async (
 };
 
 export const getQuestions = getQuestion;
-
-export const getQuestionInitials = async (): Promise<QuestionInitialsResponse | null> => {
-  try {
-    const response = await axios.get(`${apiUrl}/questions/initials`);
-    return response.data as QuestionInitialsResponse;
-  } catch (error: unknown) {
-    console.error("Error fetching question initials:", error);
-    return null;
-  }
-};
 
 export const checkQuestion = async (
   payload: CheckQuestionRequest,

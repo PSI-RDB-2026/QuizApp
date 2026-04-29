@@ -6,48 +6,25 @@ class QuestionsService:
     """Provides question-related operations"""
 
     @staticmethod
-    async def get_standard_initials() -> list[str]:
-        question_rows = await fetch_all(
-            """
-            SELECT initials
-            FROM standard_questions
-            ORDER BY id ASC
-            """
-        )
-
-        initials: list[str] = []
-        for row in question_rows:
-            question_map = row._mapping
-            initial_value = str(question_map.get("initials", "")).strip()
-            if initial_value:
-                initials.append(initial_value)
-
-        return initials
-
-    @staticmethod
     async def get_rand_question(
         question_type: Literal["standard", "yes_no"] = "standard",
     ) -> dict | None:
         """Returns one random question, filtered by type."""
 
         if question_type == "standard":
-            question = await fetch_one(
-                """
+            question = await fetch_one("""
                 SELECT id, question_text, initials, correct_answer, category, difficulty
                 FROM standard_questions
                 ORDER BY RANDOM()
                 LIMIT 1
-                """
-            )
+                """)
         elif question_type == "yes_no":
-            question = await fetch_one(
-                """
+            question = await fetch_one("""
                 SELECT id, question_text, correct_answer, category
                 FROM yes_no_questions
                 ORDER BY RANDOM()
                 LIMIT 1
-                """
-            )
+                """)
 
         if not question:
             return None

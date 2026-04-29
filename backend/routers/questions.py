@@ -5,10 +5,8 @@ from models.QuestionModels import (
     CheckQuestionRequest,
     CheckQuestionResponse,
     GetQuestionResponse,
-    QuestionInitialsResponse,
 )
 from services.QuestionsService import QuestionsService
-
 
 router = APIRouter(prefix="/api/questions", tags=["questions"])
 
@@ -30,12 +28,6 @@ async def get_question(
         category=question_item.get("category"),
         difficulty=question_item.get("difficulty"),
     )
-
-
-@router.get("/initials", response_model=QuestionInitialsResponse)
-async def get_question_initials() -> QuestionInitialsResponse:
-    initials = await QuestionsService.get_standard_initials()
-    return QuestionInitialsResponse(initials=initials)
 
 
 @router.post("/check", response_model=CheckQuestionResponse)

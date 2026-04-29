@@ -111,7 +111,7 @@ export default function StandardQuestionModal({
               <Stack gap={4}>
                 <Box>
                   <Text color="fg.muted" fontSize="sm">
-                    Category: {question.initials ?? "unknown"}
+                    Initials: {question.initials ?? "unknown"}
                   </Text>
                   <Text color="fg.muted" fontSize="sm">
                     Category: {question.category ?? "general"}

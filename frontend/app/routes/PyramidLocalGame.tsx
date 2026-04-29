@@ -8,6 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { TimerLine } from "components/General/TimerLine";
 import YesNoQuestionModal from "../../components/YesNoQuestionModal";
@@ -33,6 +34,7 @@ export function meta() {
 }
 
 export default function PyramidLocalGame() {
+  const navigate = useNavigate();
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const {
     board,
