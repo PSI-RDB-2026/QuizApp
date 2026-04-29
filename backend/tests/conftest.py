@@ -3,7 +3,6 @@ import pytest
 from fastapi.testclient import TestClient
 from argon2 import PasswordHasher
 from main import app
-from services.UserServices import UserServices
 from services.QuestionsService import QuestionsService
 
 
@@ -18,11 +17,12 @@ def test_client():
 
 @pytest.fixture
 def sample_user():
-    """Provides a sample user dict for testing authentication."""
+    """Provides a sample user dict for Firebase-based user tests."""
     plain_password = "test_password_123"
     return {
+        "uid": "firebase-user-1",
         "username": "test_user",
-        "email": "test@example.com",
+        "elo_rating": 1200,
         "password": plain_password,
         "hashed_password": password_hasher.hash(plain_password),
     }
@@ -54,18 +54,9 @@ def sample_question_yes_no():
 
 
 @pytest.fixture
-def mock_user_db(sample_user, monkeypatch):
+def mock_user_db(monkeypatch):
     """Mocks the UserServices.USERS in-memory database with test user."""
-    mock_users = {
-        sample_user["username"]: {
-            "username": sample_user["username"],
-            "email": sample_user["email"],
-            "password": sample_user["hashed_password"],
-        }
-    }
-    # Patch the UserServices.USERS directly for this test
-    monkeypatch.setattr(UserServices, "USERS", mock_users)
-    return mock_users
+    return {}  # Remove obsolete in-memory user DB fixture
 
 
 @pytest.fixture

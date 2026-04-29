@@ -8,30 +8,30 @@ class MultiplayerMatchService:
     _runtime_scores: dict[int, dict[str, int]] = {}
 
     @staticmethod
-    async def get_user_profile(email: str) -> dict:
-        return dict(await MultiplayerMatchService._get_user(email))
+    async def get_user_profile(uid: str) -> dict:
+        return dict(await MultiplayerMatchService._get_user(uid))
 
     @staticmethod
-    async def _get_user(email: str):
+    async def _get_user(uid: str):
         user = await fetch_one(
             """
-            SELECT email, username, elo_rating
+            SELECT firebase_uid AS uid, username, elo_rating
             FROM users
-            WHERE email = :email
+            WHERE firebase_uid = :uid
             """,
-            {"email": email},
+            {"uid": uid},
         )
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user._mapping
 
     @staticmethod
-    async def create_match(player1_email: str, player2_email: str) -> dict:
-        if player1_email == player2_email:
+    async def create_match(player1_uid: str, player2_uid: str) -> dict:
+        if player1_uid == player2_uid:
             raise HTTPException(status_code=400, detail="Cannot create match with the same player")
 
-        player1 = await MultiplayerMatchService._get_user(player1_email)
-        player2 = await MultiplayerMatchService._get_user(player2_email)
+        player1 = await MultiplayerMatchService._get_user(player1_uid)
+        player2 = await MultiplayerMatchService._get_user(player2_uid)
 
         match = await fetch_one(
             """
@@ -39,20 +39,20 @@ class MultiplayerMatchService:
             VALUES (:player1, :player2, 'ongoing')
             RETURNING id, status, started_at
             """,
-            {"player1": player1_email, "player2": player2_email},
+            {"player1": player1_uid, "player2": player2_uid},
         )
         match_map = match._mapping
         match_id = match_map["id"]
         MultiplayerMatchService._runtime_scores[match_id] = {
-            player1_email: 0,
-            player2_email: 0,
+            player1_uid: 0,
+            player2_uid: 0,
         }
         return {
             "id": match_id,
             "status": match_map["status"],
             "started_at": match_map["started_at"],
             "finished_at": None,
-            "winner_email": None,
+            "winner_uid": None,
             "player1": dict(player1),
             "player2": dict(player2),
             "player1_score": 0,
@@ -89,7 +89,7 @@ class MultiplayerMatchService:
             "status": match_map["status"],
             "started_at": match_map["started_at"],
             "finished_at": match_map["finished_at"],
-            "winner_email": match_map["winner_id"],
+            "winner_uid": match_map["winner_id"],
             "player1": dict(player1),
             "player2": dict(player2),
             "player1_score": score_map.get(match_map["player1_id"], 0),
@@ -97,22 +97,22 @@ class MultiplayerMatchService:
         }
 
     @staticmethod
-    async def ensure_participant(match_id: int, player_email: str) -> dict:
+    async def ensure_participant(match_id: int, player_uid: str) -> dict:
         match = await MultiplayerMatchService.get_match(match_id)
-        if player_email not in {match["player1"]["email"], match["player2"]["email"]}:
+        if player_uid not in {match["player1"]["uid"], match["player2"]["uid"]}:
             raise HTTPException(status_code=403, detail="You are not a participant in this match")
         return match
 
     @staticmethod
     async def submit_turn(
         match_id: int,
-        player_email: str,
+        player_uid: str,
         tile_id: int,
         question_type: str,
         question_id: int,
         is_correct: bool,
     ) -> dict:
-        match = await MultiplayerMatchService.ensure_participant(match_id, player_email)
+        match = await MultiplayerMatchService.ensure_participant(match_id, player_uid)
         if match["status"] != "ongoing":
             raise HTTPException(status_code=409, detail="Match is already finished")
 
@@ -126,7 +126,7 @@ class MultiplayerMatchService:
             """,
             {
                 "match_id": match_id,
-                "player_id": player_email,
+                "player_id": player_uid,
                 "tile_id": tile_id,
                 "standard_question_id": standard_question_id,
                 "yes_no_question_id": yes_no_question_id,
@@ -137,12 +137,12 @@ class MultiplayerMatchService:
         score_map = MultiplayerMatchService._runtime_scores.setdefault(
             match_id,
             {
-                match["player1"]["email"]: match["player1_score"],
-                match["player2"]["email"]: match["player2_score"],
+                match["player1"]["uid"]: match["player1_score"],
+                match["player2"]["uid"]: match["player2_score"],
             },
         )
         if is_correct:
-            score_map[player_email] = score_map.get(player_email, 0) + 1
+            score_map[player_uid] = score_map.get(player_uid, 0) + 1
 
         return {
             "match_id": match_id,
@@ -150,8 +150,8 @@ class MultiplayerMatchService:
             "question_type": question_type,
             "question_id": question_id,
             "is_correct": is_correct,
-            "player1_score": score_map.get(match["player1"]["email"], 0),
-            "player2_score": score_map.get(match["player2"]["email"], 0),
+            "player1_score": score_map.get(match["player1"]["uid"], 0),
+            "player2_score": score_map.get(match["player2"]["uid"], 0),
         }
 
     @staticmethod
@@ -162,9 +162,9 @@ class MultiplayerMatchService:
         return winner_delta, loser_delta
 
     @staticmethod
-    async def _update_elo(winner_email: str, loser_email: str) -> tuple[int, int]:
-        winner = await MultiplayerMatchService._get_user(winner_email)
-        loser = await MultiplayerMatchService._get_user(loser_email)
+    async def _update_elo(winner_uid: str, loser_uid: str) -> tuple[int, int]:
+        winner = await MultiplayerMatchService._get_user(winner_uid)
+        loser = await MultiplayerMatchService._get_user(loser_uid)
         winner_delta, loser_delta = MultiplayerMatchService._elo_delta(
             winner["elo_rating"], loser["elo_rating"]
         )
@@ -173,36 +173,39 @@ class MultiplayerMatchService:
             """
             UPDATE users
             SET elo_rating = elo_rating + :elo_delta
-            WHERE email = :email
+            WHERE firebase_uid = :uid
             """,
-            {"elo_delta": winner_delta, "email": winner_email},
+            {"elo_delta": winner_delta, "uid": winner_uid},
         )
         await execute(
             """
             UPDATE users
             SET elo_rating = elo_rating + :elo_delta
-            WHERE email = :email
+            WHERE firebase_uid = :uid
             """,
-            {"elo_delta": loser_delta, "email": loser_email},
+            {"elo_delta": loser_delta, "uid": loser_uid},
         )
         return winner_delta, loser_delta
 
     @staticmethod
     async def finalize_match(
         match_id: int,
-        winner_email: str,
+        winner_uid: str,
         status: str = "completed",
     ) -> dict:
         match = await MultiplayerMatchService.get_match(match_id)
-        participants = [match["player1"]["email"], match["player2"]["email"]]
-        if winner_email not in participants:
+        participants = [match["player1"]["uid"], match["player2"]["uid"]]
+        if winner_uid not in participants:
             raise HTTPException(status_code=400, detail="Winner must be a participant")
 
-        loser_email = participants[1] if participants[0] == winner_email else participants[0]
-        winner_delta, loser_delta = await MultiplayerMatchService._update_elo(winner_email, loser_email)
+        loser_uid = participants[1] if participants[0] == winner_uid else participants[0]
+        winner_delta, loser_delta = await MultiplayerMatchService._update_elo(
+            winner_uid,
+            loser_uid,
+        )
 
-        player1_delta = winner_delta if match["player1"]["email"] == winner_email else loser_delta
-        player2_delta = winner_delta if match["player2"]["email"] == winner_email else loser_delta
+        player1_delta = winner_delta if match["player1"]["uid"] == winner_uid else loser_delta
+        player2_delta = winner_delta if match["player2"]["uid"] == winner_uid else loser_delta
 
         await execute(
             """
@@ -215,7 +218,7 @@ class MultiplayerMatchService:
             WHERE id = :match_id
             """,
             {
-                "winner_id": winner_email,
+                "winner_id": winner_uid,
                 "player1_elo_change": player1_delta,
                 "player2_elo_change": player2_delta,
                 "status": status,
@@ -227,14 +230,14 @@ class MultiplayerMatchService:
         return await MultiplayerMatchService.get_match(match_id)
 
     @staticmethod
-    async def forfeit(match_id: int, forfeited_email: str) -> dict:
-        match = await MultiplayerMatchService.ensure_participant(match_id, forfeited_email)
+    async def forfeit(match_id: int, forfeited_uid: str) -> dict:
+        match = await MultiplayerMatchService.ensure_participant(match_id, forfeited_uid)
         if match["status"] != "ongoing":
             raise HTTPException(status_code=409, detail="Match is already finished")
 
-        winner_email = (
-            match["player2"]["email"]
-            if match["player1"]["email"] == forfeited_email
-            else match["player1"]["email"]
+        winner_uid = (
+            match["player2"]["uid"]
+            if match["player1"]["uid"] == forfeited_uid
+            else match["player1"]["uid"]
         )
-        return await MultiplayerMatchService.finalize_match(match_id, winner_email, status="aborted")
+        return await MultiplayerMatchService.finalize_match(match_id, winner_uid, status="aborted")

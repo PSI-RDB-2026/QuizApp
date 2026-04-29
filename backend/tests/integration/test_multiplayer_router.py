@@ -16,26 +16,26 @@ from services.UserServices import UserServices
 def mock_multiplayer_services(monkeypatch):
     async def fake_get_user_from_token(token: str):
         if token == "valid-token":
-            return ("player_one", "player1@example.com")
+            return {"uid": "player1-uid", "username": "player_one", "elo_rating": 1200}
         if token == "valid-token-p2":
-            return ("player_two", "player2@example.com")
+            return {"uid": "player2-uid", "username": "player_two", "elo_rating": 1230}
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    async def fake_get_user_profile(email: str):
-        if email == "player1@example.com":
+    async def fake_get_user_profile(uid: str):
+        if uid == "player1-uid":
             return {
-                "email": email,
+                "uid": uid,
                 "username": "player_one",
                 "elo_rating": 1200,
             }
         return {
-            "email": email,
+            "uid": uid,
             "username": "player_two",
             "elo_rating": 1230,
         }
 
-    async def fake_join_or_match(email: str, username: str, elo_rating: int, game_mode: str):
-        if email == "player1@example.com":
+    async def fake_join_or_match(uid: str, username: str, elo_rating: int, game_mode: str):
+        if uid == "player1-uid":
             return MatchmakingResult(
                 status="queued",
                 queue_position=1,
@@ -47,7 +47,7 @@ def mock_multiplayer_services(monkeypatch):
             queue_position=None,
             elo_window=150,
             opponent=QueueEntry(
-                email="player1@example.com",
+                uid="player1-uid",
                 username="player_one",
                 elo_rating=1200,
                 game_mode=game_mode,
@@ -55,10 +55,10 @@ def mock_multiplayer_services(monkeypatch):
             ),
         )
 
-    async def fake_leave_queue(email: str):
+    async def fake_leave_queue(uid: str):
         return True
 
-    async def fake_get_queue_status(email: str):
+    async def fake_get_queue_status(uid: str):
         return {
             "in_queue": True,
             "queue_position": 1,
@@ -66,20 +66,20 @@ def mock_multiplayer_services(monkeypatch):
             "elo_window": 100,
         }
 
-    async def fake_create_match(player1_email: str, player2_email: str):
+    async def fake_create_match(player1_uid: str, player2_uid: str):
         return {
             "id": 77,
             "status": "ongoing",
             "started_at": None,
             "finished_at": None,
-            "winner_email": None,
+            "winner_uid": None,
             "player1": {
-                "email": player1_email,
+                "uid": player1_uid,
                 "username": "player_one",
                 "elo_rating": 1200,
             },
             "player2": {
-                "email": player2_email,
+                "uid": player2_uid,
                 "username": "player_two",
                 "elo_rating": 1230,
             },
@@ -93,14 +93,14 @@ def mock_multiplayer_services(monkeypatch):
             "status": "ongoing",
             "started_at": None,
             "finished_at": None,
-            "winner_email": None,
+            "winner_uid": None,
             "player1": {
-                "email": "player1@example.com",
+                "uid": "player1-uid",
                 "username": "player_one",
                 "elo_rating": 1200,
             },
             "player2": {
-                "email": "player2@example.com",
+                "uid": "player2-uid",
                 "username": "player_two",
                 "elo_rating": 1230,
             },
@@ -108,12 +108,12 @@ def mock_multiplayer_services(monkeypatch):
             "player2_score": 1,
         }
 
-    async def fake_ensure_participant(match_id: int, player_email: str):
-        if player_email not in {"player1@example.com", "player2@example.com"}:
+    async def fake_ensure_participant(match_id: int, player_uid: str):
+        if player_uid not in {"player1-uid", "player2-uid"}:
             raise HTTPException(status_code=403, detail="You are not a participant in this match")
         return await fake_get_match(match_id)
 
-    async def fake_submit_turn(match_id: int, player_email: str, tile_id: int, question_type: str, question_id: int, is_correct: bool):
+    async def fake_submit_turn(match_id: int, player_uid: str, tile_id: int, question_type: str, question_id: int, is_correct: bool):
         return {
             "match_id": match_id,
             "tile_id": tile_id,
@@ -124,20 +124,20 @@ def mock_multiplayer_services(monkeypatch):
             "player2_score": 1,
         }
 
-    async def fake_forfeit(match_id: int, forfeited_email: str):
+    async def fake_forfeit(match_id: int, forfeited_uid: str):
         return {
             "id": match_id,
             "status": "aborted",
             "started_at": None,
             "finished_at": None,
-            "winner_email": "player2@example.com",
+            "winner_uid": "player2-uid",
             "player1": {
-                "email": "player1@example.com",
+                "uid": "player1-uid",
                 "username": "player_one",
                 "elo_rating": 1200,
             },
             "player2": {
-                "email": "player2@example.com",
+                "uid": "player2-uid",
                 "username": "player_two",
                 "elo_rating": 1230,
             },
@@ -148,16 +148,16 @@ def mock_multiplayer_services(monkeypatch):
     async def fake_broadcast(match_id: int, event: str, payload: dict):
         return None
 
-    async def fake_send_to_player(match_id: int, player_email: str, event: str, payload: dict):
+    async def fake_send_to_player(match_id: int, player_uid: str, event: str, payload: dict):
         return None
 
-    async def fake_connect(match_id: int, player_email: str, websocket):
+    async def fake_connect(match_id: int, player_uid: str, websocket):
         await websocket.accept()
 
-    def fake_disconnect(match_id: int, player_email: str):
+    def fake_disconnect(match_id: int, player_uid: str):
         return None
 
-    def fake_schedule_disconnect_timer(match_id: int, player_email: str, on_timeout):
+    def fake_schedule_disconnect_timer(match_id: int, player_uid: str, on_timeout):
         return None
 
     monkeypatch.setattr(UserServices, "get_user_from_token", staticmethod(fake_get_user_from_token))
@@ -242,7 +242,7 @@ class TestMultiplayerMatchRoutes:
 
         assert response.status_code == 200
         assert response.json()["status"] == "aborted"
-        assert response.json()["winner_email"] == "player2@example.com"
+        assert response.json()["winner_uid"] == "player2-uid"
 
 
 class TestMultiplayerWebSocket:

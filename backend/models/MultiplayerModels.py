@@ -16,7 +16,7 @@ class QueueJoinResponse(BaseModel):
     status: Literal["queued", "matched"]
     queue_position: int | None = None
     matched_match_id: int | None = None
-    opponent_email: str | None = None
+    opponent_uid: str | None = None
     opponent_username: str | None = None
     elo_window: int
 
@@ -29,7 +29,7 @@ class QueueStatusResponse(BaseModel):
 
 
 class MatchParticipant(BaseModel):
-    email: str
+    uid: str
     username: str
     elo_rating: int
 
@@ -39,7 +39,7 @@ class MatchStateResponse(BaseModel):
     status: MatchStatus
     player1: MatchParticipant
     player2: MatchParticipant
-    winner_email: str | None = None
+    winner_uid: str | None = None
     player1_score: int = 0
     player2_score: int = 0
     started_at: datetime | None = None
@@ -66,7 +66,7 @@ class SubmitTurnResponse(BaseModel):
 class ForfeitResponse(BaseModel):
     match_id: int
     status: MatchStatus
-    winner_email: str
+    winner_uid: str
     reason: str
 
 
