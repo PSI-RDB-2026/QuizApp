@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -17,7 +18,6 @@ from services.MatchmakingService import MatchmakingService
 from services.MultiplayerMatchService import MultiplayerMatchService
 from services.MultiplayerRealtimeService import MultiplayerRealtimeService
 from services.UserServices import UserServices
-
 
 router = APIRouter(prefix="/api/multiplayer", tags=["multiplayer"])
 security = HTTPBearer()
@@ -303,6 +303,43 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                         "game_snapshot",
                         {"snapshot": snapshot},
                     )
+            elif msg_type == "timer_update":
+                payload = data.get("payload")
+                if isinstance(payload, dict):
+                    # Validate that the sender corresponds to the claimed turn owner
+                    sender = payload.get("sender_email")
+                    turn = payload.get("turnPlayer")
+                    try:
+                        match_info = await MultiplayerMatchService.get_match(match_id)
+                    except HTTPException:
+                        match_info = None
+
+                    if (
+                        isinstance(sender, str)
+                        and isinstance(turn, str)
+                        and match_info is not None
+                    ):
+                        expected_email = (
+                            match_info["player1"]["email"]
+                            if turn == "player1"
+                            else match_info["player2"]["email"]
+                        )
+
+                        if sender == expected_email:
+                            # Attach a server timestamp to provide monotonic ordering
+                            payload["server_ts"] = time.time()
+                            await MultiplayerRealtimeService.broadcast(
+                                match_id, "timer_update", payload
+                            )
+                        else:
+                            await MultiplayerRealtimeService.send_to_player(
+                                match_id,
+                                player_email,
+                                "error",
+                                {
+                                    "detail": "Not authorized to send timer updates for this turn"
+                                },
+                            )
     except WebSocketDisconnect:
         MultiplayerRealtimeService.disconnect(match_id, player_email)
         await MultiplayerRealtimeService.broadcast(

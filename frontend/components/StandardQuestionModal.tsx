@@ -100,8 +100,8 @@ export default function StandardQuestionModal({
                 </Stack>
                 <Box w="140px" textAlign="right" flexShrink={0}>
                   <TimerLine progress={progress} />
-                  <Text mt={2} fontSize="sm" color="whiteAlpha.900">
-                    timer
+                  <Text mt={2} fontSize="sm">
+                    Timer
                   </Text>
                 </Box>
               </HStack>
@@ -110,6 +110,9 @@ export default function StandardQuestionModal({
             <Box px={6} py={5}>
               <Stack gap={4}>
                 <Box>
+                  <Text color="fg.muted" fontSize="sm">
+                    Category: {question.initials ?? "unknown"}
+                  </Text>
                   <Text color="fg.muted" fontSize="sm">
                     Category: {question.category ?? "general"}
                   </Text>

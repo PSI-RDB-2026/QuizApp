@@ -9,13 +9,13 @@ export function otherPlayer(player: Player): Player {
   return player === "player1" ? "player2" : "player1";
 }
 
-export function createBoard(): TileCell[][] {
+export function createBoard(tileLabels: string[] = []): TileCell[][] {
   return Array.from({ length: BOARD_SIZE }, (_, row) =>
     Array.from({ length: row + 1 }, (_, col) => {
       const index = (row * (row + 1)) / 2 + col;
       return {
         id: `tile-${row}-${col}`,
-        label: String(index + 1),
+        label: tileLabels[index] ?? String(index + 1),
         row,
         col,
         state: "neutral",

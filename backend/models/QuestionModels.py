@@ -14,6 +14,11 @@ class GetQuestionResponse(BaseModel):
     difficulty: int | None = None
 
 
+class QuestionInitialsResponse(BaseModel):
+    """Response model that returns the ordered initials used for board labels."""
+    initials: list[str]
+
+
 class CheckQuestionRequest(BaseModel):
     """Request model for answer validation."""
     question_id: int

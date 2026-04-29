@@ -116,17 +116,27 @@ export function usePyramidGameController(
 
     // Sync the full shared game snapshot so both players stay aligned on the
     // current phase, timers, question, and board state.
+    // Always update board and winner (authoritative shared state)
     setBoard(snapshot.board);
-    setTurnPlayer(snapshot.turnPlayer);
     setWinner(snapshot.winner);
-    setGameState(snapshot.gameState);
-    setGameResult(snapshot.gameResult);
-    setPhase(snapshot.phase);
-    setPickSeconds(snapshot.pickSeconds);
-    setQuestionSeconds(snapshot.questionSeconds);
-    setSwitchSeconds(snapshot.switchSeconds);
-    setStatusPopup(snapshot.statusPopup);
-    setActiveChallenge(snapshot.activeChallenge);
+
+    // If this client is NOT the timer-controller, apply the full snapshot
+    // including phase, turn owner and timers. If this client controls timers
+    // locally, avoid overwriting local phase/turn/timers to prevent feedback
+    // loops; still apply non-timer fields like game result.
+    if (!timersEnabled) {
+      setTurnPlayer(snapshot.turnPlayer);
+      setGameState(snapshot.gameState);
+      setGameResult(snapshot.gameResult);
+      setPhase(snapshot.phase);
+      setPickSeconds(snapshot.pickSeconds);
+      setQuestionSeconds(snapshot.questionSeconds);
+      setSwitchSeconds(snapshot.switchSeconds);
+      setStatusPopup(snapshot.statusPopup);
+      setActiveChallenge(snapshot.activeChallenge);
+    } else {
+      setGameResult(snapshot.gameResult);
+    }
   }, [options?.externalSnapshot]);
 
   useEffect(() => {

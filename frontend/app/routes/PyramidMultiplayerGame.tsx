@@ -207,7 +207,7 @@ export default function PyramidMultiplayerGame() {
 
   const multiplayerReady = bothPlayersConnected || hasGameplayEvidence;
   const canControlCurrentTurn =
-    mySide !== null && isMyTurn && multiplayerReady && gameState === "playing";
+    mySide !== null && isMyTurn && gameState === "playing";
 
   useEffect(() => {
     if (match?.id) {
@@ -257,6 +257,19 @@ export default function PyramidMultiplayerGame() {
     ],
   );
 
+  const currentSnapshotRef = useRef<PyramidGameSnapshot>(currentSnapshot);
+  useEffect(() => {
+    currentSnapshotRef.current = currentSnapshot;
+  }, [currentSnapshot]);
+
+  const lastServerTimerTsRef = useRef<number>(0);
+  const lastRemoteTimerRef = useRef<{
+    pickSeconds: number;
+    questionSeconds: number;
+    switchSeconds: number;
+    clientTs: number;
+  } | null>(null);
+
   const broadcastSnapshotKey = useMemo(() => {
     return JSON.stringify({
       board,
@@ -277,6 +290,53 @@ export default function PyramidMultiplayerGame() {
     statusPopup,
     turnPlayer,
     winner,
+  ]);
+
+  useEffect(() => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    if (!timersEnabled || !canControlCurrentTurn) {
+      return;
+    }
+
+    const tick = window.setInterval(() => {
+      const ws = socketRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return;
+      }
+
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "timer_update",
+            payload: {
+              sender_email: playerEmail,
+              phase,
+              turnPlayer,
+              pickSeconds,
+              questionSeconds,
+              switchSeconds,
+              client_ts: Date.now(),
+            },
+          }),
+        );
+      } catch {
+        // ignore send errors silently
+      }
+    }, 500);
+
+    return () => window.clearInterval(tick);
+  }, [
+    canControlCurrentTurn,
+    pickSeconds,
+    phase,
+    playerEmail,
+    questionSeconds,
+    switchSeconds,
+    timersEnabled,
+    turnPlayer,
   ]);
 
   useEffect(() => {
@@ -494,6 +554,99 @@ export default function PyramidMultiplayerGame() {
             });
             setRemoteSnapshot(snapshot);
           }
+          return;
+        }
+
+        if (
+          parsed.event === "timer_update" ||
+          (parsed as any).type === "timer_update"
+        ) {
+          const payload = parsed.payload ?? (parsed as any).payload ?? parsed;
+
+          if (
+            typeof payload.sender_email === "string" &&
+            payload.sender_email === playerEmail
+          ) {
+            return;
+          }
+
+          // Reject stale timer updates using server-provided timestamp
+          const serverTs =
+            typeof (payload as any).server_ts === "number"
+              ? (payload as any).server_ts
+              : null;
+          if (serverTs !== null) {
+            if (serverTs <= lastServerTimerTsRef.current) {
+              return;
+            }
+            lastServerTimerTsRef.current = serverTs;
+          }
+
+          setRemoteSnapshot((prev) => {
+            const base = prev ?? currentSnapshotRef.current;
+            const clientTs =
+              typeof (payload as any).client_ts === "number"
+                ? (payload as any).client_ts
+                : null;
+            const elapsedMs = clientTs ? Date.now() - clientTs : 0;
+
+            // Calculate interpolated timer values accounting for network delay
+            const pickSecondsRemote =
+              typeof payload.pickSeconds === "number"
+                ? Math.max(
+                    0,
+                    payload.pickSeconds - Math.floor(elapsedMs / 1000),
+                  )
+                : base.pickSeconds;
+            const questionSecondsRemote =
+              typeof payload.questionSeconds === "number"
+                ? Math.max(
+                    0,
+                    payload.questionSeconds - Math.floor(elapsedMs / 1000),
+                  )
+                : base.questionSeconds;
+            const switchSecondsRemote =
+              typeof payload.switchSeconds === "number"
+                ? Math.max(
+                    0,
+                    payload.switchSeconds - Math.floor(elapsedMs / 1000),
+                  )
+                : base.switchSeconds;
+
+            lastRemoteTimerRef.current = {
+              pickSeconds: pickSecondsRemote,
+              questionSeconds: questionSecondsRemote,
+              switchSeconds: switchSecondsRemote,
+              clientTs: clientTs ?? Date.now(),
+            };
+
+            const next = {
+              ...base,
+              phase:
+                typeof payload.phase === "string" ? payload.phase : base.phase,
+              turnPlayer:
+                typeof payload.turnPlayer === "string"
+                  ? (payload.turnPlayer as Player)
+                  : base.turnPlayer,
+              pickSeconds: pickSecondsRemote,
+              questionSeconds: questionSecondsRemote,
+              switchSeconds: switchSecondsRemote,
+            } as PyramidGameSnapshot;
+
+            lastBroadcastSnapshotRef.current = JSON.stringify({
+              board: next.board,
+              turnPlayer: next.turnPlayer,
+              winner: next.winner,
+              gameState: next.gameState,
+              gameResult: next.gameResult,
+              phase: next.phase,
+              statusPopup: next.statusPopup,
+              activeChallenge: next.activeChallenge,
+            });
+
+            return next;
+          });
+
           return;
         }
 
