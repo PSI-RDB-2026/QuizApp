@@ -15,7 +15,7 @@ from db.database import close_db, init_db
 
 
 configure_logging()
-configure_application_insights()
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +35,9 @@ async def lifespan(_: FastAPI):
             await close_db()
 
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+
+configure_application_insights(app)
 
 app.include_router(HealthRouter.router)
 app.include_router(QuestionsRouter.router)

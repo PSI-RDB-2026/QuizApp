@@ -11,6 +11,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.exc import IntegrityError
 
+try:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+except ImportError:
+    SQLAlchemyInstrumentor = None
+
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -51,6 +56,14 @@ async def init_db():
         return
 
     POOL = create_async_engine(DATABASE_URL, echo=False)
+    
+    # Instrument SQLAlchemy engine for distributed tracing
+    if SQLAlchemyInstrumentor is not None:
+        try:
+            SQLAlchemyInstrumentor.instrument(engine=POOL)
+            logger.debug("SQLAlchemy instrumentation enabled for distributed tracing")
+        except Exception as e:
+            logger.warning("Failed to instrument SQLAlchemy: %s", e)
 
     # Test connectivity
     started_at = time.perf_counter()
