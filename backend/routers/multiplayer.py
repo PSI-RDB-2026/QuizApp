@@ -305,7 +305,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                 payload = data.get("payload")
                 if isinstance(payload, dict):
                     # Validate that the sender corresponds to the claimed turn owner
-                    sender = payload.get("sender_email")
+                    sender = payload.get("sender_uid")
                     turn = payload.get("turnPlayer")
                     try:
                         match_info = await MultiplayerMatchService.get_match(match_id)
@@ -317,13 +317,13 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                         and isinstance(turn, str)
                         and match_info is not None
                     ):
-                        expected_email = (
-                            match_info["player1"]["email"]
+                        expected_uid = (
+                            match_info["player1"]["uid"]
                             if turn == "player1"
-                            else match_info["player2"]["email"]
+                            else match_info["player2"]["uid"]
                         )
 
-                        if sender == expected_email:
+                        if sender == expected_uid:
                             # Attach a server timestamp to provide monotonic ordering
                             payload["server_ts"] = time.time()
                             await MultiplayerRealtimeService.broadcast(
