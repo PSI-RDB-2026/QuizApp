@@ -13,6 +13,9 @@ httpx==0.28.1
 pytest-cov==7.1.0
 pytest-mock==3.15.1
 azure-monitor-opentelemetry>=1.8.7,<2.0.0
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-instrumentation-sqlalchemy>=0.45b0
+opentelemetry-instrumentation-requests>=0.45b0
 python-dotenv==1.0.0
 firebase-admin>=6.0.0,<7.0.0
 google-generativeai>=0.3.0,<1.0.0

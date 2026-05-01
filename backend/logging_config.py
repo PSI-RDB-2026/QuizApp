@@ -10,9 +10,19 @@ try:
 except ImportError:  # pragma: no cover - optional dependency for Azure deployments
     configure_azure_monitor = None
 
+try:
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+except ImportError:  # pragma: no cover - optional dependency for OpenTelemetry instrumentation
+    FastAPIInstrumentor = None
+    SQLAlchemyInstrumentor = None
+    RequestsInstrumentor = None
+
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 _azure_monitor_configured = False
+logger = logging.getLogger(__name__)
 
 
 _STANDARD_RECORD_FIELDS = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys())
@@ -72,7 +82,13 @@ def configure_logging(log_level: str | None = None) -> None:
         logger.setLevel(resolved_level)
 
 
-def configure_application_insights() -> None:
+def configure_application_insights(app=None) -> None:
+    """Configure Azure Application Insights with OpenTelemetry auto-instrumentation.
+    
+    Args:
+        app: FastAPI application instance for FastAPI instrumentation (optional).
+             If provided, will enable distributed tracing for FastAPI.
+    """
     global _azure_monitor_configured
 
     if _azure_monitor_configured or configure_azure_monitor is None:
@@ -82,8 +98,41 @@ def configure_application_insights() -> None:
     if not connection_string:
         return
 
+    # Configure Azure Monitor with OpenTelemetry
     configure_azure_monitor(
         connection_string=connection_string,
         disable_offline_storage=True,
     )
+    
+    # Auto-instrument FastAPI for distributed tracing
+    if FastAPIInstrumentor is not None and app is not None:
+        FastAPIInstrumentor.instrument_app(
+            app,
+            client_request_hook=_client_request_hook,
+            client_response_hook=_client_response_hook,
+        )
+    
+    # Auto-instrument SQLAlchemy for database tracing
+    if SQLAlchemyInstrumentor is not None:
+        SQLAlchemyInstrumentor.instrument()
+    
+    # Auto-instrument requests library
+    if RequestsInstrumentor is not None:
+        RequestsInstrumentor.instrument()
+    
     _azure_monitor_configured = True
+    logger.info("application_insights_configured", extra={"distributed_tracing": True})
+
+
+def _client_request_hook(span, environ):
+    """Hook to customize request spans. Exclude health checks from heavy instrumentation."""
+    path = environ.get("PATH_INFO", "")
+    if path.startswith("/api/health"):
+        span.set_attribute("http.url.path.excluded", True)
+
+
+def _client_response_hook(span, environ, response_status):
+    """Hook to customize response spans."""
+    response_status_code = int(response_status.split()[0]) if isinstance(response_status, str) else response_status
+    if response_status_code >= 500:
+        span.set_attribute("error", True)
