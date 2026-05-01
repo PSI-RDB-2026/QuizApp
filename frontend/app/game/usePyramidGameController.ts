@@ -10,16 +10,16 @@ import {
   type QuestionType,
   type TileCell,
   type TileState,
-} from "./pyramidTypes";
+} from "./pyramidTypesMultiplayer";
 import {
   createBoard,
   hasPotentialThreeSideConnection,
   otherPlayer,
   questionTypeForTile,
   touchesAllSides,
-} from "./pyramidRules";
+} from "./pyramidRulesMultiplayer";
 
-interface ActiveChallenge {
+export interface ActiveChallenge {
   row: number;
   col: number;
   ownerPlayer: Player;
@@ -28,9 +28,49 @@ interface ActiveChallenge {
   question: QuestionResponse;
 }
 
-interface GameResult {
+export interface GameResult {
   winner: Player;
   message: string;
+}
+
+export interface PyramidGameSnapshot {
+  board: TileCell[][];
+  turnPlayer: Player;
+  winner: Player | null;
+  gameState: GameState;
+  gameResult: GameResult | null;
+  phase: Phase;
+  pickSeconds: number;
+  questionSeconds: number;
+  switchSeconds: number;
+  statusPopup: string;
+  activeChallenge: ActiveChallenge | null;
+}
+
+export function logPyramidGameState(
+  snapshot: PyramidGameSnapshot,
+  label = "PyramidGame",
+) {
+  console.log(`[${label}]`, {
+    phase: snapshot.phase,
+    gameState: snapshot.gameState,
+    turnPlayer: snapshot.turnPlayer,
+    winner: snapshot.winner,
+    pickSeconds: snapshot.pickSeconds,
+    questionSeconds: snapshot.questionSeconds,
+    switchSeconds: snapshot.switchSeconds,
+    statusPopup: snapshot.statusPopup,
+    activeChallenge: snapshot.activeChallenge
+      ? {
+          row: snapshot.activeChallenge.row,
+          col: snapshot.activeChallenge.col,
+          ownerPlayer: snapshot.activeChallenge.ownerPlayer,
+          answerPlayer: snapshot.activeChallenge.answerPlayer,
+          questionType: snapshot.activeChallenge.questionType,
+          questionId: snapshot.activeChallenge.question.id,
+        }
+      : null,
+  });
 }
 
 export const PICK_SECONDS = 10;
@@ -39,15 +79,22 @@ const ANSWER_REVEAL_MS = 2200;
 
 interface UsePyramidGameControllerOptions {
   transport?: GameTransport;
+  initialTurnPlayer?: Player;
+  externalSnapshot?: PyramidGameSnapshot | null;
+  timersEnabled?: boolean;
+  debugLogging?: boolean;
 }
 
 export function usePyramidGameController(
   options?: UsePyramidGameControllerOptions,
 ) {
   const transport = options?.transport ?? localGameTransport;
+  const openingPlayer = options?.initialTurnPlayer;
+  const timersEnabled = options?.timersEnabled ?? true;
+  const debugLogging = options?.debugLogging ?? false;
   const [board, setBoard] = useState<TileCell[][]>(() => createBoard());
-  const [turnPlayer, setTurnPlayer] = useState<Player>(() =>
-    Math.random() < 0.5 ? "player1" : "player2",
+  const [turnPlayer, setTurnPlayer] = useState<Player>(
+    () => openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2"),
   );
   const [winner, setWinner] = useState<Player | null>(null);
   const [gameState, setGameState] = useState<GameState>("playing");
@@ -61,11 +108,79 @@ export function usePyramidGameController(
   const [activeChallenge, setActiveChallenge] =
     useState<ActiveChallenge | null>(null);
 
+  useEffect(() => {
+    const snapshot = options?.externalSnapshot;
+    if (!snapshot) {
+      return;
+    }
+
+    // Sync the full shared game snapshot so both players stay aligned on the
+    // current phase, timers, question, and board state.
+    // Always update board and winner (authoritative shared state)
+    setBoard(snapshot.board);
+    setWinner(snapshot.winner);
+
+    // If this client is NOT the timer-controller, apply the full snapshot
+    // including phase, turn owner and timers. If this client controls timers
+    // locally, avoid overwriting local phase/turn/timers to prevent feedback
+    // loops; still apply non-timer fields like game result.
+    if (!timersEnabled) {
+      setTurnPlayer(snapshot.turnPlayer);
+      setGameState(snapshot.gameState);
+      setGameResult(snapshot.gameResult);
+      setPhase(snapshot.phase);
+      setPickSeconds(snapshot.pickSeconds);
+      setQuestionSeconds(snapshot.questionSeconds);
+      setSwitchSeconds(snapshot.switchSeconds);
+      setStatusPopup(snapshot.statusPopup);
+      setActiveChallenge(snapshot.activeChallenge);
+    } else {
+      setGameResult(snapshot.gameResult);
+    }
+  }, [options?.externalSnapshot]);
+
+  useEffect(() => {
+    if (!debugLogging) {
+      return;
+    }
+
+    logPyramidGameState(
+      {
+        board,
+        turnPlayer,
+        winner,
+        gameState,
+        gameResult,
+        phase,
+        pickSeconds,
+        questionSeconds,
+        switchSeconds,
+        statusPopup,
+        activeChallenge,
+      },
+      "PyramidGameState",
+    );
+  }, [
+    activeChallenge,
+    board,
+    debugLogging,
+    gameResult,
+    gameState,
+    phase,
+    pickSeconds,
+    questionSeconds,
+    statusPopup,
+    switchSeconds,
+    turnPlayer,
+    winner,
+  ]);
+
   const startNewGame = () => {
-    const openingPlayer = Math.random() < 0.5 ? "player1" : "player2";
+    const nextOpeningPlayer =
+      openingPlayer ?? (Math.random() < 0.5 ? "player1" : "player2");
 
     setBoard(createBoard());
-    setTurnPlayer(openingPlayer);
+    setTurnPlayer(nextOpeningPlayer);
     setWinner(null);
     setGameState("playing");
     setGameResult(null);
@@ -99,6 +214,10 @@ export function usePyramidGameController(
   };
 
   useEffect(() => {
+    if (!timersEnabled) {
+      return;
+    }
+
     if (winner || gameState !== "playing" || phase !== "idle") {
       return;
     }
@@ -117,7 +236,7 @@ export function usePyramidGameController(
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [pickSeconds, phase, turnPlayer, winner, gameState]);
+  }, [pickSeconds, phase, turnPlayer, winner, gameState, timersEnabled]);
 
   const endChallenge = (nextTurn: Player) => {
     setTurnPlayer(nextTurn);
@@ -334,6 +453,10 @@ export function usePyramidGameController(
   };
 
   useEffect(() => {
+    if (!timersEnabled) {
+      return;
+    }
+
     if (
       gameState !== "playing" ||
       (phase !== "answering" && phase !== "stealing" && phase !== "switch")
@@ -364,7 +487,7 @@ export function usePyramidGameController(
     }, 1000);
 
     return () => window.clearTimeout(timer);
-  }, [phase, questionSeconds, switchSeconds, gameState]);
+  }, [phase, questionSeconds, switchSeconds, gameState, timersEnabled]);
 
   const concedeCurrentTurn = () => {
     const winnerPlayer = otherPlayer(turnPlayer);

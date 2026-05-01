@@ -33,7 +33,7 @@ class MultiplayerMatchService:
         player1 = await MultiplayerMatchService._get_user(player1_uid)
         player2 = await MultiplayerMatchService._get_user(player2_uid)
 
-        match = await fetch_one(
+        result = await execute(
             """
             INSERT INTO matches (player1_id, player2_id, status)
             VALUES (:player1, :player2, 'ongoing')
@@ -41,6 +41,9 @@ class MultiplayerMatchService:
             """,
             {"player1": player1_uid, "player2": player2_uid},
         )
+        match = result.fetchone()
+        if not match:
+            raise HTTPException(status_code=500, detail="Failed to create match")
         match_map = match._mapping
         match_id = match_map["id"]
         MultiplayerMatchService._runtime_scores[match_id] = {
@@ -104,6 +107,26 @@ class MultiplayerMatchService:
         return match
 
     @staticmethod
+    async def get_active_match_for_player(player_email: str) -> dict | None:
+        active_match = await fetch_one(
+            """
+            SELECT id
+            FROM matches
+            WHERE status = 'ongoing'
+              AND (player1_id = :player_email OR player2_id = :player_email)
+            ORDER BY started_at DESC
+            LIMIT 1
+            """,
+            {"player_email": player_email},
+        )
+
+        if not active_match:
+            return None
+
+        active_match_id = active_match._mapping["id"]
+        return await MultiplayerMatchService.get_match(active_match_id)
+
+    @staticmethod
     async def submit_turn(
         match_id: int,
         player_uid: str,
@@ -155,7 +178,9 @@ class MultiplayerMatchService:
         }
 
     @staticmethod
-    def _elo_delta(winner_elo: int, loser_elo: int, k_factor: int = 32) -> tuple[int, int]:
+    def _elo_delta(
+        winner_elo: int, loser_elo: int, k_factor: int = 32
+    ) -> tuple[int, int]:
         expected_win = 1 / (1 + (10 ** ((loser_elo - winner_elo) / 400)))
         winner_delta = round(k_factor * (1 - expected_win))
         loser_delta = -winner_delta
@@ -222,7 +247,7 @@ class MultiplayerMatchService:
                 "player1_elo_change": player1_delta,
                 "player2_elo_change": player2_delta,
                 "status": status,
-                "finished_at": datetime.now(timezone.utc),
+                "finished_at": datetime.utcnow(),
                 "match_id": match_id,
             },
         )

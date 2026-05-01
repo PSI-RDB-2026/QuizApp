@@ -73,20 +73,28 @@ const server = setupServer(
 
   // Mock POST /users/login endpoint
   http.post("/users/login", async ({ request }) => {
+    const url = new URL(request.url);
     const body = (await request.json()) as {
-      username: string;
-      password: string;
+      username?: string;
+      email?: string;
+      password?: string;
     };
 
+    const loginName =
+      url.searchParams.get("username") ?? body.username ?? body.email;
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
     // Simulate successful login for test_user/test_password
-    if (body.username === "test_user" && body.password === "test_password") {
+    if (loginName === "test_user" && token === "test_password") {
       return HttpResponse.json(
         {
           access_token:
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXIiLCJleHAiOjk5OTk5OTk5OTl9.mock_token",
           token_type: "bearer",
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -95,7 +103,57 @@ const server = setupServer(
       {
         detail: "Invalid username or password",
       },
-      { status: 401 }
+      { status: 401 },
+    );
+  }),
+
+  http.post("/api/users/login", async ({ request }) => {
+    const url = new URL(request.url);
+    const body = (await request.json()) as {
+      username?: string;
+      email?: string;
+      password?: string;
+    };
+
+    const loginName =
+      url.searchParams.get("username") ?? body.username ?? body.email;
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (loginName === "test_user" && token === "test_password") {
+      return HttpResponse.json(
+        {
+          access_token:
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXIiLCJleHAiOjk5OTk5OTk5OTl9.mock_token",
+          token_type: "bearer",
+        },
+        { status: 200 },
+      );
+    }
+
+    return HttpResponse.json(
+      {
+        detail: "Invalid username or password",
+      },
+      { status: 401 },
+    );
+  }),
+
+  http.post("/api/users/register", async ({ request }) => {
+    const url = new URL(request.url);
+    const username = url.searchParams.get("username");
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (username === "new_user" && token === "register_token") {
+      return HttpResponse.json({ status: "registered" });
+    }
+
+    return HttpResponse.json(
+      { detail: "Registration failed" },
+      { status: 400 },
     );
   }),
 
@@ -106,7 +164,7 @@ const server = setupServer(
     if (!authHeader) {
       return HttpResponse.json(
         { detail: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -116,9 +174,181 @@ const server = setupServer(
         username: "test_user",
         email: "test@example.com",
       },
-      { status: 200 }
+      { status: 200 },
     );
-  })
+  }),
+
+  http.get("/api/users/info", ({ request }) => {
+    const authHeader = request.headers.get("Authorization");
+
+    if (!authHeader) {
+      return HttpResponse.json(
+        { detail: "Not authenticated" },
+        { status: 401 },
+      );
+    }
+
+    return HttpResponse.json(
+      {
+        username: "test_user",
+        email: "test@example.com",
+      },
+      { status: 200 },
+    );
+  }),
+
+  http.get("/api/health/db", () => {
+    return HttpResponse.json({ db: "ok" });
+  }),
+
+  http.post("/api/multiplayer/queue/join", async ({ request }) => {
+    const body = (await request.json()) as { game_mode?: string };
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (token !== "queue_token") {
+      return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    }
+
+    return HttpResponse.json({
+      status: "queued",
+      queue_position: 1,
+      matched_match_id: null,
+      opponent_email: null,
+      opponent_username: null,
+      elo_window: body.game_mode === "pyramid" ? 50 : 25,
+    });
+  }),
+
+  http.post("/api/multiplayer/queue/leave", ({ request }) => {
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (token !== "queue_token") {
+      return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    }
+
+    return HttpResponse.json({ removed: true });
+  }),
+
+  http.get("/api/multiplayer/queue/status", ({ request }) => {
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (token !== "queue_token") {
+      return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    }
+
+    return HttpResponse.json({
+      in_queue: true,
+      queue_position: 3,
+      waited_seconds: 12,
+      elo_window: 50,
+      matched_match_id: null,
+    });
+  }),
+
+  http.get("/api/multiplayer/matches/:matchId", ({ params, request }) => {
+    const token = request.headers
+      .get("Authorization")
+      ?.replace(/^Bearer\s+/, "");
+
+    if (token !== "queue_token") {
+      return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    }
+
+    return HttpResponse.json({
+      id: Number(params.matchId),
+      status: "ongoing",
+      player1: {
+        email: "p1@example.com",
+        username: "player1",
+        elo_rating: 1500,
+      },
+      player2: {
+        email: "p2@example.com",
+        username: "player2",
+        elo_rating: 1510,
+      },
+      winner_email: null,
+      player1_score: 2,
+      player2_score: 1,
+      started_at: "2026-05-01T00:00:00Z",
+      finished_at: null,
+    });
+  }),
+
+  http.post(
+    "/api/multiplayer/matches/:matchId/turn",
+    async ({ params, request }) => {
+      const token = request.headers
+        .get("Authorization")
+        ?.replace(/^Bearer\s+/, "");
+      const body = (await request.json()) as {
+        tile_id: number;
+        question_type: string;
+        question_id: number;
+        is_correct: boolean;
+      };
+
+      if (token !== "queue_token") {
+        return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+      }
+
+      return HttpResponse.json({
+        match_id: Number(params.matchId),
+        tile_id: body.tile_id,
+        question_type: body.question_type,
+        question_id: body.question_id,
+        is_correct: body.is_correct,
+        player1_score: 3,
+        player2_score: 1,
+      });
+    },
+  ),
+
+  http.post(
+    "/api/multiplayer/matches/:matchId/forfeit",
+    ({ params, request }) => {
+      const token = request.headers
+        .get("Authorization")
+        ?.replace(/^Bearer\s+/, "");
+
+      if (token !== "queue_token") {
+        return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+      }
+
+      return HttpResponse.json({
+        match_id: Number(params.matchId),
+        status: "completed",
+        winner_email: "p2@example.com",
+        reason: "forfeit",
+      });
+    },
+  ),
+
+  http.post(
+    "/api/multiplayer/matches/:matchId/sync-game-state",
+    async ({ params, request }) => {
+      const token = request.headers
+        .get("Authorization")
+        ?.replace(/^Bearer\s+/, "");
+      const body = (await request.json()) as {
+        game_state: Record<string, unknown>;
+      };
+
+      if (token !== "queue_token") {
+        return HttpResponse.json({ detail: "Unauthorized" }, { status: 401 });
+      }
+
+      return HttpResponse.json({
+        status: body.game_state ? `synced-${params.matchId}` : "synced",
+      });
+    },
+  ),
 );
 
 // Start MSW server before all tests

@@ -19,6 +19,7 @@ interface Props {
   questionType: "standard" | "yes_no";
   remainingSeconds: number;
   totalSeconds: number;
+  interactive?: boolean;
   onAccept: () => void;
   onDecline: () => void;
 }
@@ -29,6 +30,7 @@ export default function SwitchAnswerModal({
   questionType,
   remainingSeconds,
   totalSeconds,
+  interactive = true,
   onAccept,
   onDecline,
 }: Props) {
@@ -50,9 +52,10 @@ export default function SwitchAnswerModal({
             color="fg"
             boxShadow="2xl"
             maxW="lg"
+            w={{ base: "calc(100vw - 1.5rem)", md: "lg" }}
           >
             <Box px={6} py={5} bgGradient="linear(to-r, purple.600, pink.500)">
-              <HStack justify="space-between" align="start">
+              <HStack justify="space-between" align="start" gap={4}>
                 <Stack gap={2}>
                   <Badge
                     colorPalette="whiteAlpha"
@@ -63,21 +66,18 @@ export default function SwitchAnswerModal({
                   </Badge>
                   <Heading size="lg">Do you want to answer?</Heading>
                   <Text color="whiteAlpha.900">
-                    {playerLabel} can steal this{" "}
-                    {questionType === "yes_no" ? "yes / no" : "standard"}{" "}
-                    question.
+                    {interactive
+                      ? `${playerLabel} can steal this ${questionType === "yes_no" ? "yes / no" : "standard"} question.`
+                      : "Waiting for the active player."}
                   </Text>
                 </Stack>
-                <Box textAlign="right">
-                  <Text fontSize="2xl" fontWeight="bold">
-                    {remainingSeconds}s
-                  </Text>
-                  <Text fontSize="sm" color="fg.muted">
+                <Box w="140px" textAlign="right" flexShrink={0}>
+                  <TimerLine progress={progress} />
+                  <Text mt={2} fontSize="sm" color="whiteAlpha.900">
                     timer
                   </Text>
                 </Box>
               </HStack>
-              <TimerLine progress={progress} />
             </Box>
 
             <Box px={6} py={6}>
@@ -92,10 +92,15 @@ export default function SwitchAnswerModal({
                     variant="ghost"
                     colorPalette="gray"
                     onClick={onDecline}
+                    disabled={!interactive}
                   >
                     No, pass
                   </Button>
-                  <Button colorPalette="purple" onClick={onAccept}>
+                  <Button
+                    colorPalette="purple"
+                    onClick={onAccept}
+                    disabled={!interactive}
+                  >
                     Yes, answer
                   </Button>
                 </HStack>

@@ -8,8 +8,11 @@ from fastapi import WebSocket
 class MultiplayerRealtimeService:
     _connections: dict[int, dict[str, WebSocket]] = {}
     _disconnect_tasks: dict[tuple[int, str], asyncio.Task] = {}
+    _snapshots: dict[int, dict] = {}
 
-    DISCONNECT_GRACE_SECONDS = int(os.getenv("MULTIPLAYER_DISCONNECT_GRACE_SECONDS", "30"))
+    DISCONNECT_GRACE_SECONDS = int(
+        os.getenv("MULTIPLAYER_DISCONNECT_GRACE_SECONDS", "30")
+    )
 
     @staticmethod
     async def connect(match_id: int, player_uid: str, websocket: WebSocket):
@@ -49,6 +52,18 @@ class MultiplayerRealtimeService:
         if not websocket:
             return
         await websocket.send_json({"event": event, "payload": payload})
+
+    @staticmethod
+    def set_snapshot(match_id: int, snapshot: dict):
+        MultiplayerRealtimeService._snapshots[match_id] = snapshot
+
+    @staticmethod
+    def get_snapshot(match_id: int) -> dict | None:
+        return MultiplayerRealtimeService._snapshots.get(match_id)
+
+    @staticmethod
+    def clear_snapshot(match_id: int):
+        MultiplayerRealtimeService._snapshots.pop(match_id, None)
 
     @staticmethod
     def cancel_disconnect_timer(match_id: int, player_uid: str):

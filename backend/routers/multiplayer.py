@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -17,7 +18,6 @@ from services.MatchmakingService import MatchmakingService
 from services.MultiplayerMatchService import MultiplayerMatchService
 from services.MultiplayerRealtimeService import MultiplayerRealtimeService
 from services.UserServices import UserServices
-
 
 router = APIRouter(prefix="/api/multiplayer", tags=["multiplayer"])
 security = HTTPBearer()
@@ -41,7 +41,9 @@ def _extract_user_data(user_row) -> tuple[str, str]:
     raise HTTPException(status_code=401, detail="Invalid token")
 
 
-async def _get_authenticated_user(auth: HTTPAuthorizationCredentials = Depends(security)):
+async def _get_authenticated_user(
+    auth: HTTPAuthorizationCredentials = Depends(security),
+):
     user_row = await UserServices.get_user_from_token(token=auth.credentials)
     username, uid = _extract_user_data(user_row)
     user_profile = await MultiplayerMatchService.get_user_profile(uid)
@@ -108,11 +110,21 @@ async def queue_leave(user=Depends(_get_authenticated_user)):
 @router.get("/queue/status", response_model=QueueStatusResponse)
 async def queue_status(user=Depends(_get_authenticated_user)) -> QueueStatusResponse:
     status = await MatchmakingService.get_queue_status(user["uid"])
+
+    if not status["in_queue"]:
+        active_match = await MultiplayerMatchService.get_active_match_for_player(
+            user["uid"]
+        )
+        if active_match and active_match.get("status") == "ongoing":
+            status["matched_match_id"] = active_match["id"]
+
     return QueueStatusResponse(**status)
 
 
 @router.get("/matches/{match_id}", response_model=MatchStateResponse)
-async def get_match(match_id: int, user=Depends(_get_authenticated_user)) -> MatchStateResponse:
+async def get_match(
+    match_id: int, user=Depends(_get_authenticated_user)
+) -> MatchStateResponse:
     await MultiplayerMatchService.ensure_participant(match_id, user["uid"])
     match = await MultiplayerMatchService.get_match(match_id)
     return MatchStateResponse(**match)
@@ -145,12 +157,24 @@ async def submit_turn(
             "is_correct": payload.is_correct,
         },
     )
+
+    if payload.game_state:
+        MultiplayerRealtimeService.set_snapshot(match_id, payload.game_state)
+        await MultiplayerRealtimeService.broadcast(
+            match_id,
+            "game_snapshot",
+            {"snapshot": payload.game_state},
+        )
+
     return SubmitTurnResponse(**turn_result)
 
 
 @router.post("/matches/{match_id}/forfeit", response_model=ForfeitResponse)
-async def forfeit_match(match_id: int, user=Depends(_get_authenticated_user)) -> ForfeitResponse:
+async def forfeit_match(
+    match_id: int, user=Depends(_get_authenticated_user)
+) -> ForfeitResponse:
     match = await MultiplayerMatchService.forfeit(match_id, user["uid"])
+    MultiplayerRealtimeService.clear_snapshot(match_id)
     await MultiplayerRealtimeService.broadcast(
         match_id,
         "match_finished",
@@ -195,6 +219,16 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             "match": _serialize_model(MatchStateResponse(**snapshot)),
         },
     )
+
+    stored_snapshot = MultiplayerRealtimeService.get_snapshot(match_id)
+    if stored_snapshot is not None:
+        await MultiplayerRealtimeService.send_to_player(
+            match_id,
+            player_uid,
+            "game_snapshot",
+            {"snapshot": stored_snapshot},
+        )
+
     await MultiplayerRealtimeService.broadcast(
         match_id,
         "player_connected",
@@ -206,6 +240,8 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             match = await MultiplayerMatchService.forfeit(expired_match_id, expired_player_uid)
         except HTTPException:
             return
+
+        MultiplayerRealtimeService.clear_snapshot(expired_match_id)
 
         await MultiplayerRealtimeService.broadcast(
             expired_match_id,
@@ -248,6 +284,60 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                     "match_snapshot",
                     {"match": _serialize_model(MatchStateResponse(**state))},
                 )
+                stored_snapshot = MultiplayerRealtimeService.get_snapshot(match_id)
+                if stored_snapshot is not None:
+                    await MultiplayerRealtimeService.send_to_player(
+                        match_id,
+                        player_uid,
+                        "game_snapshot",
+                        {"snapshot": stored_snapshot},
+                    )
+            elif msg_type == "game_snapshot":
+                snapshot = data.get("snapshot")
+                if isinstance(snapshot, dict):
+                    MultiplayerRealtimeService.set_snapshot(match_id, snapshot)
+                    await MultiplayerRealtimeService.broadcast(
+                        match_id,
+                        "game_snapshot",
+                        {"snapshot": snapshot},
+                    )
+            elif msg_type == "timer_update":
+                payload = data.get("payload")
+                if isinstance(payload, dict):
+                    # Validate that the sender corresponds to the claimed turn owner
+                    sender = payload.get("sender_email")
+                    turn = payload.get("turnPlayer")
+                    try:
+                        match_info = await MultiplayerMatchService.get_match(match_id)
+                    except HTTPException:
+                        match_info = None
+
+                    if (
+                        isinstance(sender, str)
+                        and isinstance(turn, str)
+                        and match_info is not None
+                    ):
+                        expected_email = (
+                            match_info["player1"]["email"]
+                            if turn == "player1"
+                            else match_info["player2"]["email"]
+                        )
+
+                        if sender == expected_email:
+                            # Attach a server timestamp to provide monotonic ordering
+                            payload["server_ts"] = time.time()
+                            await MultiplayerRealtimeService.broadcast(
+                                match_id, "timer_update", payload
+                            )
+                        else:
+                            await MultiplayerRealtimeService.send_to_player(
+                                match_id,
+                                player_uid,
+                                "error",
+                                {
+                                    "detail": "Not authorized to send timer updates for this turn"
+                                },
+                            )
     except WebSocketDisconnect:
         MultiplayerRealtimeService.disconnect(match_id, player_uid)
         await MultiplayerRealtimeService.broadcast(

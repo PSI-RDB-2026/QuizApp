@@ -8,7 +8,6 @@ from models.QuestionModels import (
 )
 from services.QuestionsService import QuestionsService
 
-
 router = APIRouter(prefix="/api/questions", tags=["questions"])
 
 

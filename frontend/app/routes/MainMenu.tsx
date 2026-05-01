@@ -12,26 +12,6 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function MainMenu() {
-  const [hello, setHello] = useState({ message: "Loading..." });
-
-  useEffect(() => {
-    const getHello = () => {
-      // Use relative path - reverse proxy will handle routing to backend
-      const apiUrl = "/api";
-      axios
-        .get(apiUrl)
-        .then((response) => {
-          console.log(response);
-          setHello(response.data);
-        })
-        .catch((error) => {
-          console.error("Error fetching from API:", error);
-          setHello({ message: "Failed to connect to backend" });
-        });
-    };
-    getHello();
-  }, []);
-
   return (
     <Container maxW="container.lg" padding={25}>
       <Flex justifyContent={"center"}>

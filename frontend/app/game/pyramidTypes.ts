@@ -1,3 +1,4 @@
+
 export type Player = "player1" | "player2";
 export type TileState = "neutral" | "black" | Player;
 export type QuestionType = "standard" | "yes_no";

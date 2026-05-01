@@ -26,6 +26,7 @@ class QueueStatusResponse(BaseModel):
     queue_position: int | None = None
     waited_seconds: int = 0
     elo_window: int | None = None
+    matched_match_id: int | None = None
 
 
 class MatchParticipant(BaseModel):
@@ -51,6 +52,7 @@ class SubmitTurnRequest(BaseModel):
     question_type: QuestionType
     question_id: int = Field(gt=0)
     is_correct: bool
+    game_state: dict | None = None
 
 
 class SubmitTurnResponse(BaseModel):

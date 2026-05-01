@@ -13,23 +13,19 @@ class QuestionsService:
         """Returns one random question, filtered by type."""
 
         if question_type == "standard":
-            question = await fetch_one(
-                """
+            question = await fetch_one("""
                 SELECT id, question_text, initials, correct_answer, category, difficulty
                 FROM standard_questions
                 ORDER BY RANDOM()
                 LIMIT 1
-                """
-            )
+                """)
         elif question_type == "yes_no":
-            question = await fetch_one(
-                """
+            question = await fetch_one("""
                 SELECT id, question_text, correct_answer, category
                 FROM yes_no_questions
                 ORDER BY RANDOM()
                 LIMIT 1
-                """
-            )
+                """)
 
         if not question:
             return None

@@ -24,16 +24,18 @@ interface Props {
   remainingSeconds: number;
   totalSeconds: number;
   mode: Mode;
+  interactive?: boolean;
   onSubmit: (answer: string) => void | Promise<void>;
 }
 
-export default function StandardQuestion({
+export default function StandardQuestionModal({
   open,
   playerLabel,
   question,
   remainingSeconds,
   totalSeconds,
   mode,
+  interactive = true,
   onSubmit,
 }: Props) {
   const [answer, setAnswer] = useState("");
@@ -43,16 +45,16 @@ export default function StandardQuestion({
     return Math.max((remainingSeconds / totalSeconds) * 100, 0);
   }, [remainingSeconds, totalSeconds]);
 
-  const accent = mode === "steal" ? "orange.500" : "blue.500";
   const banner = mode === "steal" ? "Steal chance" : "Answer now";
 
   const submit = async () => {
-    if (!answer.trim()) {
+    if (!interactive || !answer.trim()) {
       return;
     }
 
     setSubmitting(true);
     await onSubmit(answer.trim());
+    setSubmitting(false);
   };
 
   return (
@@ -69,6 +71,7 @@ export default function StandardQuestion({
             color="fg"
             boxShadow="2xl"
             maxW="2xl"
+            w={{ base: "calc(100vw - 1.5rem)", md: "2xl" }}
           >
             <Box
               px={6}
@@ -79,7 +82,7 @@ export default function StandardQuestion({
                   : "linear(to-r, blue.500, teal.500)"
               }
             >
-              <HStack justify="space-between" align="start">
+              <HStack justify="space-between" align="start" gap={4}>
                 <Stack gap={1}>
                   <Badge
                     colorPalette="whiteAlpha"
@@ -89,67 +92,58 @@ export default function StandardQuestion({
                     {banner}
                   </Badge>
                   <Heading size="lg">Standard question</Heading>
-                  <Text color="fg">{playerLabel} is on the move.</Text>
-                </Stack>
-                <Box textAlign="right">
-                  <Text fontSize="2xl" fontWeight="bold">
-                    {remainingSeconds}s
+                  <Text color="whiteAlpha.900">
+                    {interactive
+                      ? `${playerLabel} can answer now.`
+                      : "Waiting for the active player."}
                   </Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    timer
+                </Stack>
+                <Box w="140px" textAlign="right" flexShrink={0}>
+                  <TimerLine progress={progress} />
+                  <Text mt={2} fontSize="sm">
+                    Timer
                   </Text>
                 </Box>
               </HStack>
-
-              <TimerLine progress={progress} />
             </Box>
 
             <Box px={6} py={5}>
               <Stack gap={4}>
                 <Box>
                   <Text color="fg.muted" fontSize="sm">
+                    Initials: {question.initials ?? "unknown"}
+                  </Text>
+                  <Text color="fg.muted" fontSize="sm">
                     Category: {question.category ?? "general"}
                   </Text>
                   <Text color="fg.muted" fontSize="sm">
                     Difficulty: {question.difficulty ?? "n/a"}
                   </Text>
-                  {question.initials ? (
-                    <Text color="fg.muted" fontSize="sm">
-                      Hint initials: {question.initials}
-                    </Text>
-                  ) : null}
                 </Box>
 
                 <Text fontSize="xl" fontWeight="semibold" lineHeight="1.4">
                   {question.question_text}
                 </Text>
 
-                <Input
-                  value={answer}
-                  onChange={(event) => setAnswer(event.target.value)}
-                  placeholder="Type your answer"
-                  bg="bg.subtle"
-                  borderColor="border"
-                  color="fg"
-                  _placeholder={{ color: "fg.muted" }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void submit();
-                    }
-                  }}
-                />
-
-                <HStack justify="end">
-                  <Button
-                    onClick={submit}
-                    colorPalette={playerLabel == "Player 1" ? "blue" : "orange"}
-                    loading={submitting}
-                    disabled={submitting || !answer.trim()}
-                  >
-                    Submit answer
-                  </Button>
-                </HStack>
+                <Stack gap={3}>
+                  <Input
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    placeholder="Type your answer"
+                    disabled={!interactive || submitting}
+                    size="lg"
+                  />
+                  <HStack justify="end">
+                    <Button
+                      colorPalette="blue"
+                      onClick={() => void submit()}
+                      loading={submitting}
+                      disabled={!interactive || submitting || !answer.trim()}
+                    >
+                      Submit answer
+                    </Button>
+                  </HStack>
+                </Stack>
               </Stack>
             </Box>
           </Dialog.Content>
