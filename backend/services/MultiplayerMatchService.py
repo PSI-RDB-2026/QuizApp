@@ -107,17 +107,17 @@ class MultiplayerMatchService:
         return match
 
     @staticmethod
-    async def get_active_match_for_player(player_uid: str) -> dict | None:
+    async def get_active_match_for_player(player_email: str) -> dict | None:
         active_match = await fetch_one(
             """
             SELECT id
             FROM matches
             WHERE status = 'ongoing'
-              AND (player1_id = :player_uid OR player2_id = :player_uid)
+              AND (player1_id = :player_email OR player2_id = :player_email)
             ORDER BY started_at DESC
             LIMIT 1
             """,
-            {"player_uid": player_uid},
+            {"player_email": player_email},
         )
 
         if not active_match:

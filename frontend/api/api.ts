@@ -85,7 +85,7 @@ export interface QueueStatusResponse {
 }
 
 export interface MatchParticipant {
-  uid: string;
+  email: string;
   username: string;
   elo_rating: number;
 }
@@ -95,7 +95,7 @@ export interface MatchStateResponse {
   status: MultiplayerMatchStatus;
   player1: MatchParticipant;
   player2: MatchParticipant;
-  winner_uid: string | null;
+  winner_email: string | null;
   player1_score: number;
   player2_score: number;
   started_at: string | null;

@@ -1,7 +1,4 @@
 import type { AppUser } from "app/models/AppUser";
-import { AppUser as AppUserClass } from "app/models/AppUser";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "app/firebase/configuration";
 import {
   createContext,
   useContext,
@@ -17,39 +14,35 @@ interface AuthContextType {
   setUser: (user: AppUser | null) => void;
   login: (userData: AppUser) => void;
   logout: () => void;
-  isLoading: boolean;
 }
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Subscribe to Firebase auth state changes
+  const userInit: AppUser | null = JSON.parse(
+    localStorage.getItem("user") || "null",
+  );
+  const [user, setUser] = useState<AppUser | null>(userInit || null);
+  // Simulate loading user data from local storage or an API on mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        // Recreate AppUser instance from Firebase user
-        setUser(new AppUserClass(firebaseUser));
-      } else {
-        setUser(null);
+    const loadUserData = async () => {
+      const savedUser = localStorage.getItem("user");
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
       }
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+    };
+    loadUserData();
   }, []);
 
   // Function to handle user login
   const login = (userData: AppUser) => {
     setUser(userData);
-    // No need to store in localStorage - Firebase handles persistence
+    localStorage.setItem("user", JSON.stringify(userData)); // Persist user data in local storage
   };
 
   // Function to handle user logout
   const logout = () => {
     setUser(null);
-    // Firebase auth state will trigger onAuthStateChanged callback
+    localStorage.removeItem("user"); // Remove user data from local storage
   };
 
   // Context value to pass down to components
@@ -58,7 +51,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser,
     login,
     logout,
-    isLoading,
   };
 
   //(property) React.ProviderProps<null>.value: null

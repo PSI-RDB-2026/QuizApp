@@ -22,7 +22,6 @@ import {
   type MatchStateResponse,
   type MultiplayerWebSocketEvent,
 } from "api/api";
-import { useAuth } from "app/providers/AuthProvider";
 import type { Route } from "./+types/PyramidMultiplayerGame";
 import ConcedeConfirmModal from "components/ConcedeConfirmModal";
 import { TimerLine } from "components/General/TimerLine";
@@ -99,10 +98,9 @@ export function meta({}: Route.MetaArgs) {
 
 export default function PyramidMultiplayerGame() {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
   const [showConcedeConfirm, setShowConcedeConfirm] = useState(false);
   const [token, setToken] = useState<string>("");
-  const [playerUid, setPlayerUid] = useState<string>("");
+  const [playerEmail, setPlayerEmail] = useState<string>("");
   const [match, setMatch] = useState<MatchStateResponse | null>(null);
   const [queueStatusText, setQueueStatusText] = useState<string>(
     "Preparing matchmaking...",
@@ -171,20 +169,20 @@ export default function PyramidMultiplayerGame() {
   );
 
   const mySide: Player | null = useMemo(() => {
-    if (!match || !playerUid) {
+    if (!match || !playerEmail) {
       return null;
     }
 
-    if (match.player1.uid === playerUid) {
+    if (match.player1.email === playerEmail) {
       return "player1";
     }
 
-    if (match.player2.uid === playerUid) {
+    if (match.player2.email === playerEmail) {
       return "player2";
     }
 
     return null;
-  }, [match, playerUid]);
+  }, [match, playerEmail]);
 
   const isMyTurn = mySide !== null && turnPlayer === mySide;
   const bothPlayersConnected = useMemo(() => {
@@ -193,8 +191,8 @@ export default function PyramidMultiplayerGame() {
     }
 
     return (
-      connectedPlayers.has(match.player1.uid) &&
-      connectedPlayers.has(match.player2.uid)
+      connectedPlayers.has(match.player1.email) &&
+      connectedPlayers.has(match.player2.email)
     );
   }, [connectedPlayers, match]);
 
@@ -319,7 +317,7 @@ export default function PyramidMultiplayerGame() {
           JSON.stringify({
             type: "timer_update",
             payload: {
-              sender_uid: playerUid,
+              sender_email: playerEmail,
               phase,
               turnPlayer,
               pickSeconds,
@@ -339,7 +337,7 @@ export default function PyramidMultiplayerGame() {
     canControlCurrentTurn,
     pickSeconds,
     phase,
-    playerUid,
+    playerEmail,
     questionSeconds,
     switchSeconds,
     timersEnabled,
@@ -365,38 +363,29 @@ export default function PyramidMultiplayerGame() {
   }, [broadcastSnapshotKey, currentSnapshot]);
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-
-    if (!user) {
+    const rawUser = localStorage.getItem("user");
+    if (!rawUser) {
       setErrorText("You need to be logged in to play multiplayer.");
       return;
     }
 
     try {
-      const uid = user.firebaseUser.uid;
-      if (!uid) {
-        setErrorText("Unable to get user ID. Please login again.");
+      const user = JSON.parse(rawUser) as {
+        email?: string;
+        access_token?: string;
+      };
+
+      if (!user?.access_token || !user?.email) {
+        setErrorText("Missing access token. Please login again.");
         return;
       }
 
-      setPlayerUid(uid);
-      setErrorText("");
-      
-      // Get access token for API calls
-      void (async () => {
-        try {
-          const idToken = await user.getAccessToken();
-          setToken(idToken);
-        } catch (err) {
-          setErrorText("Failed to get authentication token.");
-        }
-      })();
+      setToken(user.access_token);
+      setPlayerEmail(user.email);
     } catch {
-      setErrorText("Invalid user session.");
+      setErrorText("Invalid user session in local storage.");
     }
-  }, [user, isLoading]);
+  }, []);
 
   useEffect(() => {
     if (!token || errorText || match) {
@@ -533,7 +522,7 @@ export default function PyramidMultiplayerGame() {
     socketRef.current = ws;
 
     ws.onopen = () => {
-      setConnectedPlayers(new Set(playerUid ? [playerUid] : []));
+      setConnectedPlayers(new Set(playerEmail ? [playerEmail] : []));
       setSyncStatusText("Realtime connected.");
       lastBroadcastSnapshotRef.current = "";
       ws.send(JSON.stringify({ type: "state_request" }));
@@ -587,8 +576,8 @@ export default function PyramidMultiplayerGame() {
           const payload = parsed.payload ?? (parsed as any).payload ?? parsed;
 
           if (
-            typeof payload.sender_uid === "string" &&
-            payload.sender_uid === playerUid
+            typeof payload.sender_email === "string" &&
+            payload.sender_email === playerEmail
           ) {
             return;
           }
@@ -754,7 +743,7 @@ export default function PyramidMultiplayerGame() {
       socketRef.current = null;
       setConnectedPlayers(new Set());
     };
-  }, [match?.id, token, playerUid]);
+  }, [match?.id, token, playerEmail]);
 
   const handleAnswerIfAllowed = async (answer: string | boolean) => {
     await handleAnswer(answer);
