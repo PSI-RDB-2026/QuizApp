@@ -12,11 +12,9 @@ except ImportError:  # pragma: no cover - optional dependency for Azure deployme
 
 try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
 except ImportError:  # pragma: no cover - optional dependency for OpenTelemetry instrumentation
     FastAPIInstrumentor = None
-    SQLAlchemyInstrumentor = None
     RequestsInstrumentor = None
 
 
@@ -103,23 +101,25 @@ def configure_application_insights(app=None) -> None:
         connection_string=connection_string,
         disable_offline_storage=True,
     )
-    
+
     # Auto-instrument FastAPI for distributed tracing
     if FastAPIInstrumentor is not None and app is not None:
-        FastAPIInstrumentor.instrument_app(
-            app,
-            client_request_hook=_client_request_hook,
-            client_response_hook=_client_response_hook,
-        )
-    
-    # Auto-instrument SQLAlchemy for database tracing
-    if SQLAlchemyInstrumentor is not None:
-        SQLAlchemyInstrumentor.instrument()
-    
+        try:
+            FastAPIInstrumentor().instrument_app(
+                app,
+                client_request_hook=_client_request_hook,
+                client_response_hook=_client_response_hook,
+            )
+        except Exception as error:
+            logger.warning("Failed to instrument FastAPI: %s", error)
+
     # Auto-instrument requests library
     if RequestsInstrumentor is not None:
-        RequestsInstrumentor.instrument()
-    
+        try:
+            RequestsInstrumentor().instrument()
+        except Exception as error:
+            logger.warning("Failed to instrument requests: %s", error)
+
     _azure_monitor_configured = True
     logger.info("application_insights_configured", extra={"distributed_tracing": True})
 
@@ -132,7 +132,46 @@ def _client_request_hook(span, environ):
 
 
 def _client_response_hook(span, environ, response_status):
-    """Hook to customize response spans."""
-    response_status_code = int(response_status.split()[0]) if isinstance(response_status, str) else response_status
-    if response_status_code >= 500:
+    """Hook to customize response spans.
+
+    Be defensive: some instrumentors/pass-throughs provide a dict, tuple
+    or string. Avoid raising exceptions here which would break request
+    handling inside the ASGI middleware.
+    """
+    status_code = None
+    try:
+        if isinstance(response_status, dict):
+            # common keys used by frameworks
+            for key in ("status", "status_code", "statusCode", "status-code"):
+                if key in response_status:
+                    try:
+                        status_code = int(response_status[key])
+                    except Exception:
+                        status_code = None
+                    break
+        elif isinstance(response_status, (list, tuple)) and len(response_status) > 0:
+            # sometimes a tuple like (status, headers) may be passed
+            try:
+                status_code = int(response_status[0])
+            except Exception:
+                status_code = None
+        elif isinstance(response_status, str):
+            try:
+                status_code = int(response_status.split()[0])
+            except Exception:
+                status_code = None
+        else:
+            try:
+                status_code = int(response_status)
+            except Exception:
+                status_code = None
+    except Exception:
+        # Never raise from hook
+        return
+
+    if status_code is None:
+        return
+
+    span.set_attribute("http.status_code", status_code)
+    if status_code >= 500:
         span.set_attribute("error", True)

@@ -5,6 +5,7 @@ and query execution
 import logging
 import os
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from sqlalchemy import text
@@ -56,28 +57,40 @@ async def init_db():
         return
 
     POOL = create_async_engine(DATABASE_URL, echo=False)
-    
+
     # Instrument SQLAlchemy engine for distributed tracing
     if SQLAlchemyInstrumentor is not None:
         try:
-            SQLAlchemyInstrumentor.instrument(engine=POOL)
+            SQLAlchemyInstrumentor().instrument(engine=POOL)
             logger.debug("SQLAlchemy instrumentation enabled for distributed tracing")
-        except Exception as e:
-            logger.warning("Failed to instrument SQLAlchemy: %s", e)
+        except Exception as error:
+            logger.warning("Failed to instrument SQLAlchemy: %s", error)
 
-    # Test connectivity
-    started_at = time.perf_counter()
-    try:
-        async with POOL.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        await _bootstrap_database()
-        logger.info(
-            "database_initialized",
-            extra={"duration_ms": round((time.perf_counter() - started_at) * 1000, 2)},
-        )
-    except Exception:
-        logger.exception("database_initialization_failed")
-        raise
+    # Test connectivity with retry loop to tolerate DB cold start
+    retries = int(os.getenv("DB_CONNECT_RETRIES", "15"))
+    delay = float(os.getenv("DB_CONNECT_DELAY", "1"))
+    start_time = time.perf_counter()
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            async with POOL.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            # bootstrap DB objects only after a successful connection
+            await _bootstrap_database()
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.info(
+                "database_initialized",
+                extra={"duration_ms": duration_ms, "attempts": attempt},
+            )
+            last_exc = None
+            break
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Database not ready (attempt %d/%d): %s", attempt, retries, exc)
+            if attempt == retries:
+                logger.exception("database_initialization_failed after %d attempts", retries)
+                raise
+            await asyncio.sleep(delay)
 
 
 async def close_db():
