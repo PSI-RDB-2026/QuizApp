@@ -3,7 +3,7 @@ import { ColorModeButton } from "app/components/ui/color-mode";
 //import { LogOut } from "lucide-react";
 import { useState, type FC } from "react";
 import { LuLogIn, LuLogOut } from "react-icons/lu";
-import { useNavigate } from "react-router";
+import { Link as RouterLink, useNavigate } from "react-router";
 import { ModalForm } from "./ModalForm";
 import { RegisterForm } from "./RegisterForm";
 import { useAuth } from "app/providers/AuthProvider";
@@ -14,10 +14,7 @@ export const Header: FC<Props> = (props) => {
   const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [showRegister, setShowRegister] = useState<boolean>(false);
-  const auth = useAuth();
-  const user = auth?.user;
-  const isAuthenticated = auth?.isAuthenticated ?? false;
-  const logout = auth?.logout ?? (() => undefined);
+  const { user, logout } = useAuth();
   return (
     <>
       <Flex
@@ -28,7 +25,16 @@ export const Header: FC<Props> = (props) => {
         padding={15}
         shadow={"lg"}
       >
-        <h2>QuizzApp</h2>
+        <RouterLink
+          to="/"
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            textDecoration: "none",
+          }}
+        >
+          QuizApp
+        </RouterLink>
         <Flex gap={"1rem"} alignItems="center">
           <ColorModeButton colorPalette={"green"} />
           <Button
@@ -38,11 +44,9 @@ export const Header: FC<Props> = (props) => {
           >
             Leaderboards
           </Button>
-          {!isAuthenticated ? (
-            <ModalForm />
-          ) : (
+          {user ? (
             <>
-              <p>Welcome, {user?.username}!</p>
+              <p>Welcome, {user?.firebaseUser?.displayName}!</p>
               <Button
                 variant="outline"
                 rounded={"full"}
@@ -52,6 +56,8 @@ export const Header: FC<Props> = (props) => {
                 <Icon as={LuLogOut} size={"sm"} />
               </Button>
             </>
+          ) : (
+            <ModalForm />
           )}
         </Flex>
       </Flex>

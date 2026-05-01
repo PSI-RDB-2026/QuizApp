@@ -7,13 +7,12 @@ const apiUrl = "/api";
 
 export interface RegisterRequest {
   username: string;
-  email: string;
-  password: string;
+  access_token: string;
 }
 
 export interface LoginRequest {
-  email: string;
-  password: string;
+  username: string;
+  access_token: string;
 }
 
 export interface TokenResponse {
@@ -154,54 +153,42 @@ const unwrapError = <T extends ApiErrorResponse>(
   return fallback;
 };
 
-export const postRegister = async (
-  userParams: RegisterRequest,
-): Promise<AxiosResponse<TokenResponse> | ApiErrorResponse> => {
-  const { username, email, password } = userParams;
-  try {
-    return await axios.post(`${apiUrl}/users/register`, {
-      username,
-      email,
-      password,
-    });
-  } catch (error: unknown) {
-    console.error("Error during register:", error);
-    return unwrapError(error, { message: "Unknown error" });
-  }
-};
-
-export const getLogin = async (
-  userParams: LoginRequest,
-): Promise<AxiosResponse<TokenResponse> | ApiErrorResponse> => {
-  const { email, password } = userParams;
-  try {
-    return await axios.post(`${apiUrl}/users/login`, {
-      email,
-      password,
-    });
-  } catch (error: unknown) {
-    console.error("Error during login:", error);
-    return unwrapError(error, { message: "Unknown error" });
-  }
-};
-
-export const renewToken = async (
-  token: string,
-): Promise<AxiosResponse<TokenResponse> | ApiErrorResponse> => {
-  try {
-    return await axios.post(
-      `${apiUrl}/users/token-renew`,
+export const postRegister = async (userParams: RegisterRequest) => {
+  const { username, access_token } = userParams;
+  await axios
+    .post(
+      `${apiUrl}/users/register`,
       {},
       {
+        params: { username },
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${access_token}`,
         },
       },
-    );
-  } catch (error: unknown) {
-    console.error("Error during token renewal:", error);
-    return unwrapError(error, { message: "Unknown error" });
-  }
+    )
+    .catch((error: unknown) => {
+      console.error("Error during registration:", error);
+      return unwrapError(error, { message: "Unknown error" });
+    });
+};
+
+export const postLogin = async (userParams: LoginRequest) => {
+  const { username, access_token } = userParams;
+  await axios
+    .post(
+      `${apiUrl}/users/login`,
+      {},
+      {
+        params: { username },
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      },
+    )
+    .catch((error: unknown) => {
+      console.error("Error during login:", error);
+      return unwrapError(error, { message: "Unknown error" });
+    });
 };
 
 export const getUserInfo = async (
@@ -217,21 +204,6 @@ export const getUserInfo = async (
   } catch (error: unknown) {
     console.error("Error fetching user info:", error);
     return null;
-  }
-};
-
-export const deleteUser = async (
-  token: string,
-): Promise<AxiosResponse<unknown> | ApiErrorResponse> => {
-  try {
-    return await axios.delete(`${apiUrl}/users/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  } catch (error: unknown) {
-    console.error("Error deleting user:", error);
-    return unwrapError(error, { message: "Unknown error" });
   }
 };
 

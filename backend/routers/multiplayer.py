@@ -30,10 +30,10 @@ def _extract_user_data(user_row) -> tuple[str, str]:
 
     if hasattr(user_row, "_mapping"):
         user_map = user_row._mapping
-        return user_map["username"], user_map["email"]
+        return user_map["username"], user_map["uid"]
 
     if isinstance(user_row, dict):
-        return user_row["username"], user_row["email"]
+        return user_row["username"], user_row["uid"]
 
     if isinstance(user_row, (tuple, list)) and len(user_row) >= 2:
         return str(user_row[0]), str(user_row[1])
@@ -45,11 +45,11 @@ async def _get_authenticated_user(
     auth: HTTPAuthorizationCredentials = Depends(security),
 ):
     user_row = await UserServices.get_user_from_token(token=auth.credentials)
-    username, email = _extract_user_data(user_row)
-    user_profile = await MultiplayerMatchService.get_user_profile(email)
+    username, uid = _extract_user_data(user_row)
+    user_profile = await MultiplayerMatchService.get_user_profile(uid)
     return {
+        "uid": uid,
         "username": username,
-        "email": email,
         "elo_rating": user_profile["elo_rating"],
     }
 
@@ -66,7 +66,7 @@ async def queue_join(
     user=Depends(_get_authenticated_user),
 ) -> QueueJoinResponse:
     result = await MatchmakingService.join_or_match(
-        email=user["email"],
+        uid=user["uid"],
         username=user["username"],
         elo_rating=user["elo_rating"],
         game_mode=payload.game_mode,
@@ -83,19 +83,19 @@ async def queue_join(
     if not opponent:
         raise HTTPException(status_code=500, detail="Matchmaking failed")
 
-    match = await MultiplayerMatchService.create_match(opponent.email, user["email"])
+    match = await MultiplayerMatchService.create_match(opponent.uid, user["uid"])
     logger.info(
         "matchmaking_matched",
         extra={
             "match_id": match["id"],
-            "player1": opponent.email,
-            "player2": user["email"],
+            "player1": opponent.uid,
+            "player2": user["uid"],
         },
     )
     return QueueJoinResponse(
         status="matched",
         matched_match_id=match["id"],
-        opponent_email=opponent.email,
+        opponent_uid=opponent.uid,
         opponent_username=opponent.username,
         elo_window=result.elo_window,
     )
@@ -103,17 +103,17 @@ async def queue_join(
 
 @router.post("/queue/leave")
 async def queue_leave(user=Depends(_get_authenticated_user)):
-    removed = await MatchmakingService.leave_queue(user["email"])
+    removed = await MatchmakingService.leave_queue(user["uid"])
     return {"removed": removed}
 
 
 @router.get("/queue/status", response_model=QueueStatusResponse)
 async def queue_status(user=Depends(_get_authenticated_user)) -> QueueStatusResponse:
-    status = await MatchmakingService.get_queue_status(user["email"])
+    status = await MatchmakingService.get_queue_status(user["uid"])
 
     if not status["in_queue"]:
         active_match = await MultiplayerMatchService.get_active_match_for_player(
-            user["email"]
+            user["uid"]
         )
         if active_match and active_match.get("status") == "ongoing":
             status["matched_match_id"] = active_match["id"]
@@ -125,7 +125,7 @@ async def queue_status(user=Depends(_get_authenticated_user)) -> QueueStatusResp
 async def get_match(
     match_id: int, user=Depends(_get_authenticated_user)
 ) -> MatchStateResponse:
-    await MultiplayerMatchService.ensure_participant(match_id, user["email"])
+    await MultiplayerMatchService.ensure_participant(match_id, user["uid"])
     match = await MultiplayerMatchService.get_match(match_id)
     return MatchStateResponse(**match)
 
@@ -138,7 +138,7 @@ async def submit_turn(
 ) -> SubmitTurnResponse:
     turn_result = await MultiplayerMatchService.submit_turn(
         match_id=match_id,
-        player_email=user["email"],
+        player_uid=user["uid"],
         tile_id=payload.tile_id,
         question_type=payload.question_type,
         question_id=payload.question_id,
@@ -150,7 +150,7 @@ async def submit_turn(
         "score_updated",
         {
             "match_id": match_id,
-            "player_email": user["email"],
+            "player_uid": user["uid"],
             "player1_score": turn_result["player1_score"],
             "player2_score": turn_result["player2_score"],
             "tile_id": payload.tile_id,
@@ -173,7 +173,7 @@ async def submit_turn(
 async def forfeit_match(
     match_id: int, user=Depends(_get_authenticated_user)
 ) -> ForfeitResponse:
-    match = await MultiplayerMatchService.forfeit(match_id, user["email"])
+    match = await MultiplayerMatchService.forfeit(match_id, user["uid"])
     MultiplayerRealtimeService.clear_snapshot(match_id)
     await MultiplayerRealtimeService.broadcast(
         match_id,
@@ -181,14 +181,14 @@ async def forfeit_match(
         {
             "match_id": match_id,
             "status": match["status"],
-            "winner_email": match["winner_email"],
+            "winner_uid": match["winner_uid"],
             "reason": "forfeit",
         },
     )
     return ForfeitResponse(
         match_id=match_id,
         status=match["status"],
-        winner_email=match["winner_email"],
+        winner_uid=match["winner_uid"],
         reason="forfeit",
     )
 
@@ -202,18 +202,18 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
 
     try:
         user_row = await UserServices.get_user_from_token(token=token)
-        _, player_email = _extract_user_data(user_row)
-        await MultiplayerMatchService.ensure_participant(match_id, player_email)
+        _, player_uid = _extract_user_data(user_row)
+        await MultiplayerMatchService.ensure_participant(match_id, player_uid)
     except HTTPException:
         await websocket.close(code=1008, reason="Unauthorized")
         return
 
-    await MultiplayerRealtimeService.connect(match_id, player_email, websocket)
+    await MultiplayerRealtimeService.connect(match_id, player_uid, websocket)
 
     snapshot = await MultiplayerMatchService.get_match(match_id)
     await MultiplayerRealtimeService.send_to_player(
         match_id,
-        player_email,
+        player_uid,
         "match_snapshot",
         {
             "match": _serialize_model(MatchStateResponse(**snapshot)),
@@ -224,7 +224,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
     if stored_snapshot is not None:
         await MultiplayerRealtimeService.send_to_player(
             match_id,
-            player_email,
+            player_uid,
             "game_snapshot",
             {"snapshot": stored_snapshot},
         )
@@ -232,14 +232,12 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
     await MultiplayerRealtimeService.broadcast(
         match_id,
         "player_connected",
-        {"match_id": match_id, "player_email": player_email},
+        {"match_id": match_id, "player_uid": player_uid},
     )
 
-    async def _forfeit_after_grace(expired_match_id: int, expired_player_email: str):
+    async def _forfeit_after_grace(expired_match_id: int, expired_player_uid: str):
         try:
-            match = await MultiplayerMatchService.forfeit(
-                expired_match_id, expired_player_email
-            )
+            match = await MultiplayerMatchService.forfeit(expired_match_id, expired_player_uid)
         except HTTPException:
             return
 
@@ -251,7 +249,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             {
                 "match_id": expired_match_id,
                 "status": match["status"],
-                "winner_email": match["winner_email"],
+                "winner_uid": match["winner_uid"],
                 "reason": "disconnect_timeout",
             },
         )
@@ -264,7 +262,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             except json.JSONDecodeError:
                 await MultiplayerRealtimeService.send_to_player(
                     match_id,
-                    player_email,
+                    player_uid,
                     "error",
                     {"detail": "Invalid JSON payload"},
                 )
@@ -274,7 +272,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             if msg_type == "ping":
                 await MultiplayerRealtimeService.send_to_player(
                     match_id,
-                    player_email,
+                    player_uid,
                     "pong",
                     {"match_id": match_id},
                 )
@@ -282,7 +280,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                 state = await MultiplayerMatchService.get_match(match_id)
                 await MultiplayerRealtimeService.send_to_player(
                     match_id,
-                    player_email,
+                    player_uid,
                     "match_snapshot",
                     {"match": _serialize_model(MatchStateResponse(**state))},
                 )
@@ -290,7 +288,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                 if stored_snapshot is not None:
                     await MultiplayerRealtimeService.send_to_player(
                         match_id,
-                        player_email,
+                        player_uid,
                         "game_snapshot",
                         {"snapshot": stored_snapshot},
                     )
@@ -334,21 +332,21 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
                         else:
                             await MultiplayerRealtimeService.send_to_player(
                                 match_id,
-                                player_email,
+                                player_uid,
                                 "error",
                                 {
                                     "detail": "Not authorized to send timer updates for this turn"
                                 },
                             )
     except WebSocketDisconnect:
-        MultiplayerRealtimeService.disconnect(match_id, player_email)
+        MultiplayerRealtimeService.disconnect(match_id, player_uid)
         await MultiplayerRealtimeService.broadcast(
             match_id,
             "player_disconnected",
-            {"match_id": match_id, "player_email": player_email},
+            {"match_id": match_id, "player_uid": player_uid},
         )
         MultiplayerRealtimeService.schedule_disconnect_timer(
             match_id,
-            player_email,
+            player_uid,
             _forfeit_after_grace,
         )

@@ -15,16 +15,16 @@ class MultiplayerRealtimeService:
     )
 
     @staticmethod
-    async def connect(match_id: int, player_email: str, websocket: WebSocket):
+    async def connect(match_id: int, player_uid: str, websocket: WebSocket):
         await websocket.accept()
         room = MultiplayerRealtimeService._connections.setdefault(match_id, {})
-        room[player_email] = websocket
-        MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_email)
+        room[player_uid] = websocket
+        MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_uid)
 
     @staticmethod
-    def disconnect(match_id: int, player_email: str):
+    def disconnect(match_id: int, player_uid: str):
         room = MultiplayerRealtimeService._connections.get(match_id, {})
-        room.pop(player_email, None)
+        room.pop(player_uid, None)
         if not room and match_id in MultiplayerRealtimeService._connections:
             MultiplayerRealtimeService._connections.pop(match_id, None)
 
@@ -36,21 +36,19 @@ class MultiplayerRealtimeService:
 
         message = json.dumps({"event": event, "payload": payload})
         disconnected_players = []
-        for player_email, websocket in room.items():
+        for player_uid, websocket in room.items():
             try:
                 await websocket.send_text(message)
             except Exception:
-                disconnected_players.append(player_email)
+                disconnected_players.append(player_uid)
 
-        for player_email in disconnected_players:
-            MultiplayerRealtimeService.disconnect(match_id, player_email)
+        for player_uid in disconnected_players:
+            MultiplayerRealtimeService.disconnect(match_id, player_uid)
 
     @staticmethod
-    async def send_to_player(
-        match_id: int, player_email: str, event: str, payload: dict
-    ):
+    async def send_to_player(match_id: int, player_uid: str, event: str, payload: dict):
         room = MultiplayerRealtimeService._connections.get(match_id, {})
-        websocket = room.get(player_email)
+        websocket = room.get(player_uid)
         if not websocket:
             return
         await websocket.send_json({"event": event, "payload": payload})
@@ -68,25 +66,21 @@ class MultiplayerRealtimeService:
         MultiplayerRealtimeService._snapshots.pop(match_id, None)
 
     @staticmethod
-    def cancel_disconnect_timer(match_id: int, player_email: str):
-        key = (match_id, player_email)
+    def cancel_disconnect_timer(match_id: int, player_uid: str):
+        key = (match_id, player_uid)
         task = MultiplayerRealtimeService._disconnect_tasks.pop(key, None)
         if task:
             task.cancel()
 
     @staticmethod
-    def schedule_disconnect_timer(match_id: int, player_email: str, on_timeout):
+    def schedule_disconnect_timer(match_id: int, player_uid: str, on_timeout):
         async def timer_task():
             try:
                 await asyncio.sleep(MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS)
-                await on_timeout(match_id, player_email)
+                await on_timeout(match_id, player_uid)
             finally:
-                MultiplayerRealtimeService._disconnect_tasks.pop(
-                    (match_id, player_email), None
-                )
+                MultiplayerRealtimeService._disconnect_tasks.pop((match_id, player_uid), None)
 
-        key = (match_id, player_email)
-        MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_email)
-        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(
-            timer_task()
-        )
+        key = (match_id, player_uid)
+        MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_uid)
+        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(timer_task())

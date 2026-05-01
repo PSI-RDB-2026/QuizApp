@@ -1,5 +1,6 @@
 from typing import Literal
 from db.database import execute, fetch_one, fetch_all
+from services.AIAPI import AIAPI
 
 
 class QuestionsService:
@@ -40,13 +41,14 @@ class QuestionsService:
     ) -> tuple[bool, str] | None:
         """
         Validates answer for a question id and returns correctness + expected answer.
+        Uses AI for intelligent evaluation of answers.
         Answer is either a string (for standard questions) or a boolean (for yes/no questions).
         """
 
         if question_type == "standard":
             question = await fetch_one(
                 """
-                SELECT correct_answer
+                SELECT question_text, correct_answer
                 FROM standard_questions
                 WHERE id = :id
                 """,
@@ -57,14 +59,16 @@ class QuestionsService:
                 return None
 
             question_map = question._mapping
-            correct_answer = str(question_map["correct_answer"]).strip().lower()
-            normalized_answer = str(answer).strip().lower()
-            is_correct = normalized_answer == correct_answer
+            question_text = question_map["question_text"]
+            correct_answer = question_map["correct_answer"]
+            
+            # Use AI to evaluate the answer
+            is_correct = await AIAPI.check_answer(question_text, answer, correct_answer)
 
         elif question_type == "yes_no":
             question = await fetch_one(
                 """
-                SELECT correct_answer
+                SELECT question_text, correct_answer
                 FROM yes_no_questions
                 WHERE id = :id
                 """,
@@ -75,7 +79,10 @@ class QuestionsService:
                 return None
 
             question_map = question._mapping
+            question_text = question_map["question_text"]
             correct_answer = question_map["correct_answer"]
-            is_correct = answer == correct_answer  # correct_answer is bool
+            
+            # Use AI to evaluate the answer
+            is_correct = await AIAPI.check_answer(question_text, answer, correct_answer)
 
         return is_correct, correct_answer

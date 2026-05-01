@@ -1,10 +1,13 @@
 name: Build and Deploy to Azure
 
 on:
-  workflow_run:
-    workflows: ["Test Suite"]
-    types: [completed]
+  push:
     branches: [main]
+    paths-ignore:
+      - 'prototype/**'
+      - 'docs/**'
+      - 'diagrams/**'
+      - 'README.md'
 
 env:
   REGISTRY: quizapppsi.azurecr.io
@@ -13,7 +16,6 @@ env:
 
 jobs:
   build-and-deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -33,6 +35,18 @@ jobs:
           context: ./backend
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-backend:latest
+          build-args: |
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            FIREBASE_PRIVATE_KEY_ID=${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
+            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+            FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+            FIREBASE_CLIENT_ID=${{ secrets.FIREBASE_CLIENT_ID }}
+            FIREBASE_AUTH_URI=${{ secrets.FIREBASE_AUTH_URI }}
+            FIREBASE_TOKEN_URI=${{ secrets.FIREBASE_TOKEN_URI }}
+            FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${{ secrets.FIREBASE_AUTH_PROVIDER_X509_CERT_URL }}
+            FIREBASE_CLIENT_X509_CERT_URL=${{ secrets.FIREBASE_CLIENT_X509_CERT_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
@@ -41,6 +55,14 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-frontend:latest
           build-args: VITE_API_URL=/api
+          secrets: |
+            FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+            FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+            FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+            FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+            FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
 
       - name: Build and push nginx proxy
         uses: docker/build-push-action@v5
@@ -49,4 +71,3 @@ jobs:
           file: nginx/Dockerfile
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-proxy:latest
-
