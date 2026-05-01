@@ -12,11 +12,9 @@ except ImportError:  # pragma: no cover - optional dependency for Azure deployme
 
 try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
 except ImportError:  # pragma: no cover - optional dependency for OpenTelemetry instrumentation
     FastAPIInstrumentor = None
-    SQLAlchemyInstrumentor = None
     RequestsInstrumentor = None
 
 
@@ -103,23 +101,25 @@ def configure_application_insights(app=None) -> None:
         connection_string=connection_string,
         disable_offline_storage=True,
     )
-    
+
     # Auto-instrument FastAPI for distributed tracing
     if FastAPIInstrumentor is not None and app is not None:
-        FastAPIInstrumentor.instrument_app(
-            app,
-            client_request_hook=_client_request_hook,
-            client_response_hook=_client_response_hook,
-        )
-    
-    # Auto-instrument SQLAlchemy for database tracing
-    if SQLAlchemyInstrumentor is not None:
-        SQLAlchemyInstrumentor.instrument()
-    
+        try:
+            FastAPIInstrumentor().instrument_app(
+                app,
+                client_request_hook=_client_request_hook,
+                client_response_hook=_client_response_hook,
+            )
+        except Exception as error:
+            logger.warning("Failed to instrument FastAPI: %s", error)
+
     # Auto-instrument requests library
     if RequestsInstrumentor is not None:
-        RequestsInstrumentor.instrument()
-    
+        try:
+            RequestsInstrumentor().instrument()
+        except Exception as error:
+            logger.warning("Failed to instrument requests: %s", error)
+
     _azure_monitor_configured = True
     logger.info("application_insights_configured", extra={"distributed_tracing": True})
 

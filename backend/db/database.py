@@ -56,14 +56,14 @@ async def init_db():
         return
 
     POOL = create_async_engine(DATABASE_URL, echo=False)
-    
+
     # Instrument SQLAlchemy engine for distributed tracing
     if SQLAlchemyInstrumentor is not None:
         try:
-            SQLAlchemyInstrumentor.instrument(engine=POOL)
+            SQLAlchemyInstrumentor().instrument(engine=POOL)
             logger.debug("SQLAlchemy instrumentation enabled for distributed tracing")
-        except Exception as e:
-            logger.warning("Failed to instrument SQLAlchemy: %s", e)
+        except Exception as error:
+            logger.warning("Failed to instrument SQLAlchemy: %s", error)
 
     # Test connectivity
     started_at = time.perf_counter()
