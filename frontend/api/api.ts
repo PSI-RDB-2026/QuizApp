@@ -24,6 +24,20 @@ export interface UserInfoResponse {
   username: string;
   email: string;
 }
+
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  elo: number;
+  elo_rating?: number;
+  winRate?: number;
+  win_rate?: number;
+  matches: number;
+}
+
+export interface LeaderboardResponse {
+  leaderboard: LeaderboardEntry[];
+}
 export interface MultiplayerTurnContext {
   token: string;
   matchId: number;
@@ -204,6 +218,28 @@ export const getUserInfo = async (
   } catch (error: unknown) {
     console.error("Error fetching user info:", error);
     return null;
+  }
+};
+
+export const getLeaderboard = async (
+  limit: number = 30,
+): Promise<LeaderboardEntry[]> => {
+  try {
+    const response = await axios.get(`${apiUrl}/users/leaderboard`, {
+      params: { limit },
+    });
+    const data = response.data as LeaderboardResponse;
+    // Transform the response to match our LeaderboardEntry interface
+    return data.leaderboard.map((entry, index) => ({
+      rank: index + 1,
+      username: entry.username,
+      elo: entry.elo || entry.elo_rating || 0,
+      winRate: entry.win_rate || entry.winRate || 0,
+      matches: entry.matches || 0,
+    }));
+  } catch (error: unknown) {
+    console.error("Error fetching leaderboard:", error);
+    return [];
   }
 };
 
