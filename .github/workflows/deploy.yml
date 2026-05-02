@@ -35,7 +35,7 @@ jobs:
           context: ./backend
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-backend:latest
-          build-args: |
+          secrets: |
             FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
             FIREBASE_PRIVATE_KEY_ID=${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
             FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
@@ -54,7 +54,8 @@ jobs:
           context: ./frontend
           push: true
           tags: ${{ env.REGISTRY }}/quizapp-frontend:latest
-          build-args: VITE_API_URL=/api
+          build-args: |
+            VITE_API_URL=/api
           secrets: |
             FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
             FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
@@ -63,7 +64,6 @@ jobs:
             FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
             FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
             FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
-
       - name: Build and push nginx proxy
         uses: docker/build-push-action@v5
         with:
