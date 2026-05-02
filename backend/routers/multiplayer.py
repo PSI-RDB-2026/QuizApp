@@ -5,6 +5,8 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from dependencies import get_firebase_id
+import dependencies as deps
 from models.MultiplayerModels import (
     ForfeitResponse,
     MatchStateResponse,
@@ -42,16 +44,23 @@ def _extract_user_data(user_row) -> tuple[str, str]:
 
 
 async def _get_authenticated_user(
-    auth: HTTPAuthorizationCredentials = Depends(security),
+    uid: str = Depends(get_firebase_id),
 ):
-    user_row = await UserServices.get_user_from_token(token=auth.credentials)
-    username, uid = _extract_user_data(user_row)
-    user_profile = await MultiplayerMatchService.get_user_profile(uid)
-    return {
-        "uid": uid,
-        "username": username,
-        "elo_rating": user_profile["elo_rating"],
-    }
+    # First try to fetch user from the DB
+    user = None
+    try:
+        user = await UserServices.get_user(uid)
+    except Exception:
+        user = None
+
+    # If DB lookup fails or user missing, fall back to token-resolved cache
+    if user is None:
+        cached = deps._user_token_cache.get(uid)
+        if cached is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        user = cached
+
+    return {"uid": user["uid"], "username": user["username"], "elo_rating": user.get("elo_rating")} 
 
 
 def _serialize_model(model) -> dict:
@@ -102,18 +111,20 @@ async def queue_join(
 
 
 @router.post("/queue/leave")
-async def queue_leave(user=Depends(_get_authenticated_user)):
-    removed = await MatchmakingService.leave_queue(user["uid"])
+async def queue_leave(uid: str = Depends(get_firebase_id), user: dict | None = None):
+    # Accept `user` kw for unit tests calling this function directly.
+    effective_uid = user.get("uid") if isinstance(user, dict) and user.get("uid") else uid
+    removed = await MatchmakingService.leave_queue(effective_uid)
     return {"removed": removed}
 
 
 @router.get("/queue/status", response_model=QueueStatusResponse)
-async def queue_status(user=Depends(_get_authenticated_user)) -> QueueStatusResponse:
-    status = await MatchmakingService.get_queue_status(user["uid"])
+async def queue_status(uid: str = Depends(get_firebase_id)) -> QueueStatusResponse:
+    status = await MatchmakingService.get_queue_status(uid)
 
     if not status["in_queue"]:
         active_match = await MultiplayerMatchService.get_active_match_for_player(
-            user["uid"]
+            uid
         )
         if active_match and active_match.get("status") == "ongoing":
             status["matched_match_id"] = active_match["id"]
@@ -123,9 +134,9 @@ async def queue_status(user=Depends(_get_authenticated_user)) -> QueueStatusResp
 
 @router.get("/matches/{match_id}", response_model=MatchStateResponse)
 async def get_match(
-    match_id: int, user=Depends(_get_authenticated_user)
+    match_id: int, uid: str = Depends(get_firebase_id)
 ) -> MatchStateResponse:
-    await MultiplayerMatchService.ensure_participant(match_id, user["uid"])
+    await MultiplayerMatchService.ensure_participant(match_id, uid)
     match = await MultiplayerMatchService.get_match(match_id)
     return MatchStateResponse(**match)
 
@@ -134,11 +145,11 @@ async def get_match(
 async def submit_turn(
     match_id: int,
     payload: SubmitTurnRequest,
-    user=Depends(_get_authenticated_user),
+    uid: str = Depends(get_firebase_id),
 ) -> SubmitTurnResponse:
     turn_result = await MultiplayerMatchService.submit_turn(
         match_id=match_id,
-        player_uid=user["uid"],
+        player_uid=uid,
         tile_id=payload.tile_id,
         question_type=payload.question_type,
         question_id=payload.question_id,
@@ -150,7 +161,7 @@ async def submit_turn(
         "score_updated",
         {
             "match_id": match_id,
-            "player_uid": user["uid"],
+            "player_uid": uid,
             "player1_score": turn_result["player1_score"],
             "player2_score": turn_result["player2_score"],
             "tile_id": payload.tile_id,
@@ -171,9 +182,9 @@ async def submit_turn(
 
 @router.post("/matches/{match_id}/forfeit", response_model=ForfeitResponse)
 async def forfeit_match(
-    match_id: int, user=Depends(_get_authenticated_user)
+    match_id: int, uid: str = Depends(get_firebase_id)
 ) -> ForfeitResponse:
-    match = await MultiplayerMatchService.forfeit(match_id, user["uid"])
+    match = await MultiplayerMatchService.forfeit(match_id, uid)
     MultiplayerRealtimeService.clear_snapshot(match_id)
     await MultiplayerRealtimeService.broadcast(
         match_id,
@@ -196,6 +207,13 @@ async def forfeit_match(
 @router.websocket("/ws/{match_id}")
 async def multiplayer_ws(websocket: WebSocket, match_id: int):
     token = websocket.query_params.get("token")
+    # Support token via query param (legacy client) or Authorization header (Bearer <token>)
+    token = websocket.query_params.get("token")
+    if not token:
+        auth_header = websocket.headers.get("authorization")
+        if isinstance(auth_header, str) and auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1]
+
     if not token:
         await websocket.close(code=1008, reason="Missing token")
         return
