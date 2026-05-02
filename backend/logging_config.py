@@ -124,20 +124,53 @@ def configure_application_insights(app=None) -> None:
     logger.info("application_insights_configured", extra={"distributed_tracing": True})
 
 
-def _client_request_hook(span, environ):
-    """Hook to customize request spans. Exclude health checks from heavy instrumentation."""
-    path = environ.get("PATH_INFO", "")
-    if path.startswith("/api/health"):
-        span.set_attribute("http.url.path.excluded", True)
+def _client_request_hook(span, environ=None, *args):
+    """Hook to customize request spans. Accepts flexible signatures from
+    different instrumentors (ASGI/WSGI). Exclude health checks from heavy
+    instrumentation.
+
+    The instrumentor may call this hook with (span, environ), (span, scope),
+    or (span, request, response) etc. Be defensive and try to locate a
+    mapping-like object with PATH_INFO or 'path' keys.
+    """
+    if not environ:
+        # Try to find a mapping-like arg in *args
+        for candidate in args:
+            if isinstance(candidate, dict):
+                environ = candidate
+                break
+
+    if not environ or not isinstance(environ, dict):
+        return
+
+    # Common keys across WSGI/ASGI
+    path = environ.get("PATH_INFO") or environ.get("path") or ""
+    if isinstance(path, str) and path.startswith("/api/health"):
+        try:
+            span.set_attribute("http.url.path.excluded", True)
+        except Exception:
+            # Never raise from hook
+            return
 
 
-def _client_response_hook(span, environ, response_status):
+def _client_response_hook(span, environ=None, response_status=None, *args):
     """Hook to customize response spans.
 
     Be defensive: some instrumentors/pass-throughs provide a dict, tuple
     or string. Avoid raising exceptions here which would break request
     handling inside the ASGI middleware.
     """
+    # Try to be flexible with different instrumentor signatures. If
+    # `response_status` wasn't provided, try to find it in args or in
+    # `environ`-like objects.
+    if response_status is None:
+        for candidate in args:
+            if candidate is None:
+                continue
+            if isinstance(candidate, (dict, list, tuple, str, int)):
+                response_status = candidate
+                break
+
     status_code = None
     try:
         if isinstance(response_status, dict):

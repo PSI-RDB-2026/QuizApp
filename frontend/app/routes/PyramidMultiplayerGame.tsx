@@ -17,6 +17,7 @@ import {
   getMultiplayerQueueStatus,
   getMultiplayerWebSocketUrl,
   joinMultiplayerQueue,
+  postLogin,
   type ApiErrorResponse,
   type MatchStateResponse,
   type MultiplayerWebSocketEvent,
@@ -428,6 +429,13 @@ export default function PyramidMultiplayerGame() {
     };
 
     const startQueue = async () => {
+      if (user) {
+        await postLogin({
+          username: user.getDisplayName(),
+          access_token: token,
+        });
+      }
+
       const joined = await joinMultiplayerQueue(token, {
         game_mode: "pyramid",
       });
@@ -508,7 +516,7 @@ export default function PyramidMultiplayerGame() {
         intervalRef.current = null;
       }
     };
-  }, [token, match, errorText]);
+  }, [token, match, errorText, user]);
 
   useEffect(() => {
     if (!token || !match) {

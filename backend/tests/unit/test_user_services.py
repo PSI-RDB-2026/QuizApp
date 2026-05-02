@@ -47,6 +47,40 @@ async def test_get_user_failure(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_leaderboard_success(monkeypatch):
+    captured = {}
+
+    async def fake(query, params):
+        captured["query"] = query
+        captured["params"] = params
+        return [
+            DummyRow({"uid": "u1", "username": "alice", "elo_rating": 1600, "win_rate": 0.75, "matches": 4}),
+            DummyRow({"uid": "u2", "username": "bob", "elo_rating": 1500, "win_rate": 0.5, "matches": 2}),
+        ]
+
+    monkeypatch.setattr("services.UserServices.fetch_all", fake)
+    leaderboard = await UserServices.get_leaderboard(2)
+    assert "u.firebase_uid AS uid" in captured["query"]
+    assert "u.email" not in captured["query"]
+    assert captured["params"] == {"limit": 2}
+    assert leaderboard[0]["uid"] == "u1"
+    assert leaderboard[1]["elo_rating"] == 1500
+    assert leaderboard[0]["win_rate"] == 0.75
+    assert leaderboard[1]["matches"] == 2
+
+
+@pytest.mark.asyncio
+async def test_get_leaderboard_failure(monkeypatch):
+    async def bad(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("services.UserServices.fetch_all", bad)
+    with pytest.raises(HTTPException) as ei:
+        await UserServices.get_leaderboard()
+    assert ei.value.status_code == 500
+
+
+@pytest.mark.asyncio
 async def test_create_user_duplicate_uid(monkeypatch):
     # execute raises IntegrityError with orig indicating users_pkey
     async def exec_err(*args, **kwargs):
