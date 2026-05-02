@@ -42,6 +42,13 @@ async def get_user_info(
     })
 
 
+@router.get("/leaderboard")
+async def get_leaderboard(limit: int = 30) -> JSONResponse:
+    """Get the top users ranked by Elo rating."""
+    leaderboard = await UserServices.get_leaderboard(limit)
+    return JSONResponse(content={"leaderboard": leaderboard})
+
+
 @router.post("/login")
 async def login_user(username: str, uid: str = Depends(get_firebase_id)):
     """Login Firebase-authenticated user by checking local DB."""
