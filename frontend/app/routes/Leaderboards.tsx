@@ -13,6 +13,7 @@ import {
 import { useColorModeValue } from "app/components/ui/color-mode";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { getLeaderboard } from "api/api";
 
 interface LeaderboardEntry {
   rank: number;
@@ -22,54 +23,7 @@ interface LeaderboardEntry {
   matches: number;
 }
 
-interface LeaderboardPlayer {
-  username: string;
-  elo: number;
-  winRate: number;
-  matches: number;
-}
-
 const PAGE_SIZE = 10;
-
-const MOCK_PLAYERS: LeaderboardPlayer[] = [
-  { username: "ProGamer2024", elo: 1915, winRate: 71.4, matches: 62 },
-  { username: "QuizMaster", elo: 1878, winRate: 69.6, matches: 58 },
-  { username: "BrainChampion", elo: 1844, winRate: 68.2, matches: 71 },
-  { username: "TriviaNinja", elo: 1816, winRate: 66.9, matches: 54 },
-  { username: "CerebralKing", elo: 1792, winRate: 65.7, matches: 49 },
-  { username: "MindSolver", elo: 1769, winRate: 64.8, matches: 66 },
-  { username: "LogicLord", elo: 1734, winRate: 63.2, matches: 61 },
-  { username: "ThinkTank", elo: 1718, winRate: 62.4, matches: 57 },
-  { username: "NeuralNet", elo: 1697, winRate: 61.1, matches: 53 },
-  { username: "SynapseSeeker", elo: 1679, winRate: 60.4, matches: 50 },
-  { username: "GreenGenius", elo: 1656, winRate: 59.8, matches: 48 },
-  { username: "PyramidAce", elo: 1638, winRate: 58.9, matches: 46 },
-  { username: "AnswerAlchemist", elo: 1621, winRate: 58.1, matches: 44 },
-  { username: "HexaHero", elo: 1604, winRate: 57.5, matches: 42 },
-  { username: "ClueCaptain", elo: 1588, winRate: 56.8, matches: 41 },
-  { username: "PulsePilot", elo: 1572, winRate: 55.9, matches: 39 },
-  { username: "QuestionQuarry", elo: 1558, winRate: 55.1, matches: 38 },
-  { username: "RiddleRunner", elo: 1541, winRate: 54.6, matches: 37 },
-  { username: "TileTactician", elo: 1527, winRate: 53.9, matches: 35 },
-  { username: "StackedStrategy", elo: 1513, winRate: 53.2, matches: 34 },
-  { username: "BoardBeast", elo: 1498, winRate: 52.8, matches: 33 },
-  { username: "QueryKnight", elo: 1484, winRate: 52.1, matches: 32 },
-  { username: "MatchMage", elo: 1471, winRate: 51.4, matches: 31 },
-  { username: "EloEcho", elo: 1458, winRate: 50.8, matches: 30 },
-  { username: "Winwave", elo: 1442, winRate: 50.1, matches: 29 },
-  { username: "BrainBloom", elo: 1428, winRate: 49.7, matches: 28 },
-  { username: "QuizCurrent", elo: 1414, winRate: 49.1, matches: 27 },
-  { username: "PonderPeak", elo: 1399, winRate: 48.6, matches: 26 },
-  { username: "LogicLeaf", elo: 1385, winRate: 48.0, matches: 25 },
-  { username: "GreenSignal", elo: 1369, winRate: 47.4, matches: 24 },
-];
-
-const SORTED_LEADERBOARD: LeaderboardEntry[] = [...MOCK_PLAYERS]
-  .sort((first, second) => second.elo - first.elo)
-  .map((player, index) => ({
-    ...player,
-    rank: index + 1,
-  }));
 
 export function meta() {
   return [
@@ -104,13 +58,13 @@ export default function Leaderboards() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        // TODO: Replace with actual API call to /api/users/leaderboard.
-        // The mocked data keeps the page usable until the backend endpoint exists.
-        setLeaderboard(SORTED_LEADERBOARD);
+        setLoading(true);
+        const data = await getLeaderboard(100);
+        setLeaderboard(data);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
-        setError("Failed to load leaderboard. Displaying mock data.");
-        setLeaderboard(SORTED_LEADERBOARD);
+        setError("Failed to load leaderboard.");
+        setLeaderboard([]);
       } finally {
         setLoading(false);
       }

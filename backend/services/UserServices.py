@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
 from models.UserModels import RegisterRequest
-from db.database import execute, fetch_one
+from db.database import execute, fetch_all, fetch_one
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,46 @@ class UserServices:
         except Exception as exc:
             logger.exception("error_fetching_user", extra={"uid": uid})
             raise HTTPException(status_code=500, detail="Could not fetch user.") from exc
+
+    @staticmethod
+    async def get_leaderboard(limit: int = 10) -> list[dict]:
+        """Return the top users ordered by Elo rating with win rate and match count."""
+        try:
+            rows = await fetch_all(
+                """
+                SELECT 
+                    u.firebase_uid AS uid,
+                    u.username,
+                    u.elo_rating,
+                    COALESCE(w.wins::float / NULLIF(m.total_matches, 0), 0.0) AS win_rate,
+                    COALESCE(m.total_matches, 0) AS matches
+                FROM users u
+                LEFT JOIN (
+                    SELECT winner_id, COUNT(*) AS wins
+                    FROM matches
+                    WHERE status = 'completed'
+                    GROUP BY winner_id
+                ) w ON u.firebase_uid = w.winner_id
+                LEFT JOIN (
+                    SELECT player_id, COUNT(*) AS total_matches
+                    FROM (
+                        SELECT player1_id AS player_id FROM matches WHERE status = 'completed'
+                        UNION ALL
+                        SELECT player2_id AS player_id FROM matches WHERE status = 'completed'
+                    ) AS all_matches
+                    GROUP BY player_id
+                ) m ON u.firebase_uid = m.player_id
+                ORDER BY u.elo_rating DESC, u.username ASC
+                LIMIT :limit
+                """,
+                {"limit": limit},
+            )
+            leaderboard = [UserServices._row_to_dict(row) for row in rows]
+            logger.debug("leaderboard_fetched", extra={"limit": limit, "count": len(leaderboard)})
+            return leaderboard
+        except Exception as exc:
+            logger.exception("error_fetching_leaderboard", extra={"limit": limit})
+            raise HTTPException(status_code=500, detail="Could not fetch leaderboard.") from exc
 
     @staticmethod
     async def create_user(user: RegisterRequest) -> dict:
