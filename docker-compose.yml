@@ -75,6 +75,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      secrets:
+        - FIREBASE_API_KEY
+        - FIREBASE_AUTH_DOMAIN
+        - FIREBASE_PROJECT_ID
+        - FIREBASE_STORAGE_BUCKET
+        - FIREBASE_MESSAGING_SENDER_ID
+        - FIREBASE_APP_ID
+        - FIREBASE_MEASUREMENT_ID
     container_name: quizapp-frontend
     depends_on:
       backend:
@@ -88,3 +96,19 @@ networks:
 
 volumes:
   postgres_data:
+
+secrets:
+  FIREBASE_API_KEY:
+    environment: FIREBASE_API_KEY
+  FIREBASE_AUTH_DOMAIN:
+    environment: FIREBASE_AUTH_DOMAIN
+  FIREBASE_PROJECT_ID:
+    environment: FIREBASE_PROJECT_ID
+  FIREBASE_STORAGE_BUCKET:
+    environment: FIREBASE_STORAGE_BUCKET
+  FIREBASE_MESSAGING_SENDER_ID:
+    environment: FIREBASE_MESSAGING_SENDER_ID
+  FIREBASE_APP_ID:
+    environment: FIREBASE_APP_ID
+  FIREBASE_MEASUREMENT_ID:
+    environment: FIREBASE_MEASUREMENT_ID

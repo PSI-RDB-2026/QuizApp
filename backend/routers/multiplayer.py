@@ -50,10 +50,13 @@ async def _get_authenticated_user(
     user = None
     try:
         user = await UserServices.get_user(uid)
-    except Exception:
-        user = None
+    except Exception as exc:
+        cached = deps._user_token_cache.get(uid)
+        if cached is None:
+            logger.exception("db_lookup_failed_for_authenticated_user", extra={"uid": uid})
+            raise HTTPException(status_code=503, detail="Database unavailable") from exc
+        user = cached
 
-    # If DB lookup fails or user missing, fall back to token-resolved cache
     if user is None:
         cached = deps._user_token_cache.get(uid)
         if cached is None:
