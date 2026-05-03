@@ -266,14 +266,14 @@ Query parameter:
 
 Response model: `GetQuestionResponse`
 
-| Field           | Type      | Notes             |
-| --------------- | --------- | ----------------- | ------------------------------ |
-| `id`            | `int`     | Question id       |
-| `question_type` | `standard | yes_no`           | Selected question type         |
-| `question_text` | `string`  | The question text |
-| `initials`      | `string   | null`             | Present for standard questions |
-| `category`      | `string   | null`             | Category label                 |
-| `difficulty`    | `int      | null`             | Present for standard questions |
+| Field           | Type                   | Notes                          |
+| --------------- | ---------------------- | ------------------------------ |
+| `id`            | `int`                  | Question id                    |
+| `question_type` | `standard` or `yes_no` | Selected question type         |
+| `question_text` | `string`               | The question text              |
+| `initials`      | `string` or `null`     | Present for standard questions |
+| `category`      | `string` or `null`     | Category label                 |
+| `difficulty`    | `int` or `null`        | Present for standard questions |
 
 Behavior:
 
@@ -308,18 +308,18 @@ GET /api/questions?question_type=yes_no
 
 Request model: `CheckQuestionRequest`
 
-| Field           | Type      | Notes    |
-| --------------- | --------- | -------- | -------------------------------------------------- | ----------------------------------------------------- |
-| `question_id`   | `int`     | Required |
-| `answer`        | `string   | bool`    | Standard questions use `string`, yes/no use `bool` |
-| `question_type` | `standard | yes_no   | null`                                              | Optional; defaults to `standard` in the service layer |
+| Field           | Type                             | Notes                                                 |
+| --------------- | -------------------------------- | ----------------------------------------------------- |
+| `question_id`   | `int`                            | Required                                              |
+| `answer`        | `string` or `bool`               | Standard questions use `string`, yes/no use `bool`    |
+| `question_type` | `standard` or `yes_no` or `null` | Optional; defaults to `standard` in the service layer |
 
 Response model: `CheckQuestionResponse`
 
-| Field            | Type    | Notes                      |
-| ---------------- | ------- | -------------------------- | --------------------------------------- |
-| `is_correct`     | `bool`  | Whether the answer matches |
-| `correct_answer` | `string | bool`                      | Expected answer returned by the service |
+| Field            | Type               | Notes                                   |
+| ---------------- | ------------------ | --------------------------------------- |
+| `is_correct`     | `bool`             | Whether the answer matches              |
+| `correct_answer` | `string` or `bool` | Expected answer returned by the service |
 
 Behavior:
 
@@ -364,74 +364,74 @@ Request model: `QueueJoinRequest`
 
 Response model: `QueueJoinResponse`
 
-| Field               | Type    | Notes                   |
-| ------------------- | ------- | ----------------------- | ------------------------- |
-| `status`            | `queued | matched`                | Current matchmaking state |
-| `queue_position`    | `int    | null`                   | Present when queued       |
-| `matched_match_id`  | `int    | null`                   | Present when matched      |
-| `opponent_uid`      | `string | null`                   | Present when matched      |
-| `opponent_username` | `string | null`                   | Present when matched      |
-| `elo_window`        | `int`   | Matchmaking window size |
+| Field               | Type                  | Notes                     |
+| ------------------- | --------------------- | ------------------------- |
+| `status`            | `queued` or `matched` | Current matchmaking state |
+| `queue_position`    | `int` or `null`       | Present when queued       |
+| `matched_match_id`  | `int` or `null`       | Present when matched      |
+| `opponent_uid`      | `string` or `null`    | Present when matched      |
+| `opponent_username` | `string` or `null`    | Present when matched      |
+| `elo_window`        | `int`                 | Matchmaking window size   |
 
 #### Queue status
 
 Response model: `QueueStatusResponse`
 
-| Field              | Type   | Notes                                |
-| ------------------ | ------ | ------------------------------------ | ------------------------------- |
-| `in_queue`         | `bool` | Whether the user is currently queued |
-| `queue_position`   | `int   | null`                                | Queue position when queued      |
-| `waited_seconds`   | `int`  | Seconds spent waiting                |
-| `elo_window`       | `int   | null`                                | Active Elo search window        |
-| `matched_match_id` | `int   | null`                                | Set when a match already exists |
+| Field              | Type            | Notes                                |
+| ------------------ | --------------- | ------------------------------------ |
+| `in_queue`         | `bool`          | Whether the user is currently queued |
+| `queue_position`   | `int` or `null` | Queue position when queued           |
+| `waited_seconds`   | `int`           | Seconds spent waiting                |
+| `elo_window`       | `int` or `null` | Active Elo search window             |
+| `matched_match_id` | `int` or `null` | Set when a match already exists      |
 
 #### Match state
 
 Response model: `MatchStateResponse`
 
-| Field                             | Type               | Notes           |
-| --------------------------------- | ------------------ | --------------- | --------------------------- | ------------ |
-| `id`                              | `int`              | Match id        |
-| `status`                          | `ongoing           | completed       | aborted`                    | Match status |
-| `player1` / `player2`             | `MatchParticipant` | Player metadata |
-| `winner_uid`                      | `string            | null`           | Winner UID when match ended |
-| `player1_score` / `player2_score` | `int`              | Current score   |
-| `started_at` / `finished_at`      | `datetime          | null`           | Timestamps                  |
+| Field                             | Type                                 | Notes                       |
+| --------------------------------- | ------------------------------------ | --------------------------- |
+| `id`                              | `int`                                | Match id                    |
+| `status`                          | `ongoing`, `completed`, or `aborted` | Match status                |
+| `player1` / `player2`             | `MatchParticipant`                   | Player metadata             |
+| `winner_uid`                      | `string` or `null`                   | Winner UID when match ended |
+| `player1_score` / `player2_score` | `int`                                | Current score               |
+| `started_at` / `finished_at`      | `datetime` or `null`                 | Timestamps                  |
 
 #### Turn submission
 
 Request model: `SubmitTurnRequest`
 
-| Field           | Type      | Notes                  |
-| --------------- | --------- | ---------------------- | ------------------------------------ |
-| `tile_id`       | `int`     | Must be greater than 0 |
-| `question_type` | `standard | yes_no`                | Required                             |
-| `question_id`   | `int`     | Must be greater than 0 |
-| `is_correct`    | `bool`    | Evaluated result       |
-| `game_state`    | `dict     | null`                  | Optional snapshot broadcast to peers |
+| Field           | Type                   | Notes                                |
+| --------------- | ---------------------- | ------------------------------------ |
+| `tile_id`       | `int`                  | Must be greater than 0               |
+| `question_type` | `standard` or `yes_no` | Required                             |
+| `question_id`   | `int`                  | Must be greater than 0               |
+| `is_correct`    | `bool`                 | Evaluated result                     |
+| `game_state`    | `dict` or `null`       | Optional snapshot broadcast to peers |
 
 Response model: `SubmitTurnResponse`
 
-| Field           | Type      |
-| --------------- | --------- | ------- |
-| `match_id`      | `int`     |
-| `tile_id`       | `int`     |
-| `question_type` | `standard | yes_no` |
-| `question_id`   | `int`     |
-| `is_correct`    | `bool`    |
-| `player1_score` | `int`     |
-| `player2_score` | `int`     |
+| Field           | Type                   |
+| --------------- | ---------------------- |
+| `match_id`      | `int`                  |
+| `tile_id`       | `int`                  |
+| `question_type` | `standard` or `yes_no` |
+| `question_id`   | `int`                  |
+| `is_correct`    | `bool`                 |
+| `player1_score` | `int`                  |
+| `player2_score` | `int`                  |
 
 #### Forfeit
 
 Response model: `ForfeitResponse`
 
-| Field        | Type     | Notes                      |
-| ------------ | -------- | -------------------------- | -------- | ------------ |
-| `match_id`   | `int`    | Match id                   |
-| `status`     | `ongoing | completed                  | aborted` | Final status |
-| `winner_uid` | `string` | Winner UID after forfeit   |
-| `reason`     | `string` | The backend uses `forfeit` |
+| Field        | Type                                 | Notes                      |
+| ------------ | ------------------------------------ | -------------------------- |
+| `match_id`   | `int`                                | Match id                   |
+| `status`     | `ongoing`, `completed`, or `aborted` | Final status               |
+| `winner_uid` | `string`                             | Winner UID after forfeit   |
+| `reason`     | `string`                             | The backend uses `forfeit` |
 
 #### WebSocket behavior
 
