@@ -674,15 +674,15 @@ export default function PyramidMultiplayerGame() {
         }
 
         if (parsed.event === "player_connected") {
-          const connectedEmail =
-            typeof parsed.payload.player_email === "string"
-              ? parsed.payload.player_email
+          const connectedUid =
+            typeof parsed.payload.player_uid === "string"
+              ? parsed.payload.player_uid
               : "";
 
-          if (connectedEmail) {
+          if (connectedUid) {
             setConnectedPlayers((current) => {
               const next = new Set(current);
-              next.add(connectedEmail);
+              next.add(connectedUid);
               return next;
             });
           }
@@ -690,15 +690,15 @@ export default function PyramidMultiplayerGame() {
         }
 
         if (parsed.event === "player_disconnected") {
-          const disconnectedEmail =
-            typeof parsed.payload.player_email === "string"
-              ? parsed.payload.player_email
+          const disconnectedUid =
+            typeof parsed.payload.player_uid === "string"
+              ? parsed.payload.player_uid
               : "";
 
-          if (disconnectedEmail) {
+          if (disconnectedUid) {
             setConnectedPlayers((current) => {
               const next = new Set(current);
-              next.delete(disconnectedEmail);
+              next.delete(disconnectedUid);
               return next;
             });
           }
