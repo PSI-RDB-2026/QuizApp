@@ -56,7 +56,7 @@ async def init_db():
     if POOL is not None:
         return
 
-    POOL = create_async_engine(DATABASE_URL, echo=False)
+    POOL = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
 
     # Instrument SQLAlchemy engine for distributed tracing
     if SQLAlchemyInstrumentor is not None:

@@ -17,6 +17,7 @@ import {
   getMultiplayerQueueStatus,
   getMultiplayerWebSocketUrl,
   joinMultiplayerQueue,
+  postLogin,
   type ApiErrorResponse,
   type MatchStateResponse,
   type MultiplayerWebSocketEvent,
@@ -428,6 +429,13 @@ export default function PyramidMultiplayerGame() {
     };
 
     const startQueue = async () => {
+      if (user) {
+        await postLogin({
+          username: user.getDisplayName(),
+          access_token: token,
+        });
+      }
+
       const joined = await joinMultiplayerQueue(token, {
         game_mode: "pyramid",
       });
@@ -508,7 +516,7 @@ export default function PyramidMultiplayerGame() {
         intervalRef.current = null;
       }
     };
-  }, [token, match, errorText]);
+  }, [token, match, errorText, user]);
 
   useEffect(() => {
     if (!token || !match) {
@@ -666,15 +674,15 @@ export default function PyramidMultiplayerGame() {
         }
 
         if (parsed.event === "player_connected") {
-          const connectedEmail =
-            typeof parsed.payload.player_email === "string"
-              ? parsed.payload.player_email
+          const connectedUid =
+            typeof parsed.payload.player_uid === "string"
+              ? parsed.payload.player_uid
               : "";
 
-          if (connectedEmail) {
+          if (connectedUid) {
             setConnectedPlayers((current) => {
               const next = new Set(current);
-              next.add(connectedEmail);
+              next.add(connectedUid);
               return next;
             });
           }
@@ -682,15 +690,15 @@ export default function PyramidMultiplayerGame() {
         }
 
         if (parsed.event === "player_disconnected") {
-          const disconnectedEmail =
-            typeof parsed.payload.player_email === "string"
-              ? parsed.payload.player_email
+          const disconnectedUid =
+            typeof parsed.payload.player_uid === "string"
+              ? parsed.payload.player_uid
               : "";
 
-          if (disconnectedEmail) {
+          if (disconnectedUid) {
             setConnectedPlayers((current) => {
               const next = new Set(current);
-              next.delete(disconnectedEmail);
+              next.delete(disconnectedUid);
               return next;
             });
           }

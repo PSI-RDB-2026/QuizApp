@@ -201,6 +201,23 @@ const server = setupServer(
     return HttpResponse.json({ db: "ok" });
   }),
 
+  // Mock GET /api/users/leaderboard endpoint with 30 mock entries
+  http.get("/api/users/leaderboard", ({ request }) => {
+    const url = new URL(request.url);
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? Math.min(Number(limitParam), 100) : 30;
+
+    const baseUsers = Array.from({ length: 30 }).map((_, i) => ({
+      username:
+        i === 0 ? "ProGamer2024" : i === 10 ? "GreenGenius" : `Player${i + 1}`,
+      elo_rating: 1600 - i * 5,
+      win_rate: Math.max(0, 100 - i * 2),
+      matches: 50 + i,
+    }));
+
+    return HttpResponse.json({ leaderboard: baseUsers.slice(0, limit) });
+  }),
+
   http.post("/api/multiplayer/queue/join", async ({ request }) => {
     const body = (await request.json()) as { game_mode?: string };
     const token = request.headers

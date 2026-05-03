@@ -69,3 +69,21 @@ class TestUsersRouter:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "User not found in database."
+
+    def test_get_leaderboard_returns_sorted_users(self, test_client, monkeypatch):
+        async def fake_get_leaderboard(limit: int = 10):
+            return [
+                {"uid": "u-1", "username": "alice", "elo_rating": 1700, "win_rate": 0.8, "matches": 5},
+                {"uid": "u-2", "username": "bob", "elo_rating": 1600, "win_rate": 0.6, "matches": 3},
+            ][:limit]
+
+        monkeypatch.setattr(UserServices, "get_leaderboard", staticmethod(fake_get_leaderboard))
+
+        response = test_client.get("/api/users/leaderboard", params={"limit": 2})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["leaderboard"][0]["username"] == "alice"
+        assert data["leaderboard"][1]["elo_rating"] == 1600
+        assert data["leaderboard"][0]["win_rate"] == 0.8
+        assert data["leaderboard"][1]["matches"] == 3
