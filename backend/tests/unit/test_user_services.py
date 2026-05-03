@@ -62,6 +62,7 @@ async def test_get_leaderboard_success(monkeypatch):
     leaderboard = await UserServices.get_leaderboard(2)
     assert "u.firebase_uid AS uid" in captured["query"]
     assert "u.email" not in captured["query"]
+    assert "status IN ('completed', 'aborted')" in captured["query"]
     assert captured["params"] == {"limit": 2}
     assert leaderboard[0]["uid"] == "u1"
     assert leaderboard[1]["elo_rating"] == 1500
