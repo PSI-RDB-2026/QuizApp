@@ -51,21 +51,21 @@ class UserServices:
                     u.firebase_uid AS uid,
                     u.username,
                     u.elo_rating,
-                    COALESCE(w.wins::float / NULLIF(m.total_matches, 0), 0.0) AS win_rate,
+                    COALESCE((w.wins::float / NULLIF(m.total_matches, 0)) * 100, 0.0) AS win_rate,
                     COALESCE(m.total_matches, 0) AS matches
                 FROM users u
                 LEFT JOIN (
                     SELECT winner_id, COUNT(*) AS wins
                     FROM matches
-                    WHERE status = 'completed'
+                    WHERE status IN ('completed', 'aborted')
                     GROUP BY winner_id
                 ) w ON u.firebase_uid = w.winner_id
                 LEFT JOIN (
                     SELECT player_id, COUNT(*) AS total_matches
                     FROM (
-                        SELECT player1_id AS player_id FROM matches WHERE status = 'completed'
+                        SELECT player1_id AS player_id FROM matches WHERE status IN ('completed', 'aborted')
                         UNION ALL
-                        SELECT player2_id AS player_id FROM matches WHERE status = 'completed'
+                        SELECT player2_id AS player_id FROM matches WHERE status IN ('completed', 'aborted')
                     ) AS all_matches
                     GROUP BY player_id
                 ) m ON u.firebase_uid = m.player_id
