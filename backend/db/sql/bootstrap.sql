@@ -191,7 +191,7 @@ INSERT INTO standard_questions (initials, question_text, correct_answer, categor
 ('M', 'What is the capital of Russia?', 'Moscow', 'Geography', 1),
 ('B', 'What is the capital of Germany?', 'Berlin', 'Geography', 1),
 ('D', 'What is the capital of Ireland?', 'Dublin', 'Geography', 2),
-('L', 'What is the capital of the United Kingdom?', 'London', 'Geography', 1),
+('L', 'What is the capital of the United Kingdom?', 'London', 'Geography', 1)
 ON CONFLICT (question_text) DO NOTHING;
 
 INSERT INTO yes_no_questions (question_text, correct_answer, category) VALUES
