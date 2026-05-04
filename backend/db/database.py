@@ -8,6 +8,7 @@ import time
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.exc import IntegrityError
@@ -138,6 +139,29 @@ async def execute(query: str, *args):
         raise
     except Exception:
         logger.exception("database_query_failed", extra={"query": query[:200]})
+        raise
+
+
+async def execute_on_connection(conn: Any, query: str, *args):
+    """Executes a query on an existing DB connection or transaction."""
+    params = _normalize_params(args)
+    return await conn.execute(text(query), params)
+
+
+@asynccontextmanager
+async def transaction():
+    """Provides a transaction-scoped connection."""
+    if POOL is None:
+        await init_db()
+
+    started_at = time.perf_counter()
+    try:
+        async with POOL.begin() as conn:
+            yield conn
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        logger.debug("database_transaction_executed", extra={"duration_ms": duration_ms})
+    except Exception:
+        logger.exception("database_transaction_failed")
         raise
 
 

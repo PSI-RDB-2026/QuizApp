@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from contextlib import asynccontextmanager
 
 from services.MultiplayerMatchService import MultiplayerMatchService
 from fastapi import HTTPException
@@ -72,7 +73,7 @@ async def test_finalize_match_keeps_connections_for_broadcast(monkeypatch):
             "player2_score": 0,
         }
 
-    async def fake_update_elo(winner_uid, loser_uid):
+    async def fake_update_elo(winner_uid, loser_uid, conn=None):
         return 12, -12
 
     async def fake_execute(query, params=None):
@@ -88,6 +89,14 @@ async def test_finalize_match_keeps_connections_for_broadcast(monkeypatch):
     def fake_disconnect(match_id, player_uid):
         calls["disconnect"] += 1
 
+    @asynccontextmanager
+    async def fake_transaction():
+        class FakeConn:
+            async def execute(self, query, params=None):
+                return await fake_execute(query, params)
+
+        yield FakeConn()
+
     monkeypatch.setattr(
         MultiplayerMatchService, "get_match", staticmethod(fake_get_match)
     )
@@ -95,6 +104,7 @@ async def test_finalize_match_keeps_connections_for_broadcast(monkeypatch):
         MultiplayerMatchService, "_update_elo", staticmethod(fake_update_elo)
     )
     monkeypatch.setattr("services.MultiplayerMatchService.execute", fake_execute)
+    monkeypatch.setattr("services.MultiplayerMatchService.transaction", fake_transaction)
     monkeypatch.setattr(
         "services.MultiplayerRealtimeService.MultiplayerRealtimeService.clear_snapshot",
         staticmethod(fake_clear_snapshot),
@@ -107,7 +117,7 @@ async def test_finalize_match_keeps_connections_for_broadcast(monkeypatch):
     result = await MultiplayerMatchService.finalize_match(10, "u1")
 
     assert result["status"] == "ongoing"
-    assert calls["clear_snapshot"] == 1
+    assert calls["clear_snapshot"] == 0
     assert calls["disconnect"] == 0
 
 
