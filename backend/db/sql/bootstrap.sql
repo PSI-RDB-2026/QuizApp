@@ -60,6 +60,9 @@ COMMENT ON COLUMN match_turns.tile_id IS 'Tile number 1-28 on the AZ kvíz pyram
 COMMENT ON COLUMN match_turns.standard_question_id IS 'Null if a Yes/No question was used';
 COMMENT ON COLUMN match_turns.yes_no_question_id IS 'Null if a standard question was used';
 
+DELETE FROM standard_questions;
+DELETE FROM yes_no_questions;
+
 INSERT INTO standard_questions (initials, question_text, correct_answer, category, difficulty) VALUES
 ('ME', 'What is the tallest mountain on Earth?', 'Mount Everest', 'Geography', 1),
 ('MS', 'Which planet is known as the Red Planet?', 'Mars', 'Science', 1),
@@ -215,3 +218,18 @@ INSERT INTO yes_no_questions (question_text, correct_answer, category) VALUES
 ('Is the capital of Russia Saint Petersburg?', false, 'Geography'),
 ('Is the human skeleton made of bones?', true, 'Science')
 ON CONFLICT (question_text) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_users_leaderboard_rank
+ON users (elo_rating DESC, username ASC);
+
+CREATE INDEX IF NOT EXISTS idx_matches_finished_winner_id
+ON matches (winner_id)
+WHERE status IN ('completed', 'aborted');
+
+CREATE INDEX IF NOT EXISTS idx_matches_finished_player1_id
+ON matches (player1_id)
+WHERE status IN ('completed', 'aborted');
+
+CREATE INDEX IF NOT EXISTS idx_matches_finished_player2_id
+ON matches (player2_id)
+WHERE status IN ('completed', 'aborted');
