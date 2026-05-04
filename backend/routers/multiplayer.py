@@ -95,7 +95,17 @@ async def queue_join(
     if not opponent:
         raise HTTPException(status_code=500, detail="Matchmaking failed")
 
-    match = await MultiplayerMatchService.create_match(opponent.uid, user["uid"])
+    try:
+        match = await MultiplayerMatchService.create_match(opponent.uid, user["uid"])
+    except Exception as exc:
+        await MatchmakingService.requeue_entry(opponent)
+        if isinstance(exc, HTTPException):
+            raise
+        logger.exception(
+            "match_creation_failed_after_queue_match",
+            extra={"opponent_uid": opponent.uid, "uid": user["uid"]},
+        )
+        raise HTTPException(status_code=503, detail="Match creation failed") from exc
     logger.info(
         "matchmaking_matched",
         extra={
@@ -256,6 +266,61 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
         {"match_id": match_id, "player_uid": player_uid},
     )
 
+    match_snapshot = await MultiplayerMatchService.get_match(match_id)
+    participant_uids = {match_snapshot["player1"]["uid"], match_snapshot["player2"]["uid"]}
+
+    if MultiplayerRealtimeService.has_both_players_connected(match_id, participant_uids):
+        MultiplayerRealtimeService.cancel_match_start_timer(match_id)
+        await MultiplayerRealtimeService.broadcast(
+            match_id,
+            "both_players_connected",
+            {
+                "match_id": match_id,
+                "player_uids": sorted(participant_uids),
+            },
+        )
+    else:
+        async def _forfeit_missing_start_player(expired_match_id: int):
+            try:
+                match = await MultiplayerMatchService.get_match(expired_match_id)
+            except HTTPException:
+                return
+
+            connected_player_uids = MultiplayerRealtimeService.get_connected_player_uids(
+                expired_match_id
+            )
+            if len(connected_player_uids) != 1:
+                return
+
+            active_uid = next(iter(connected_player_uids))
+            inactive_uid = (
+                match["player1"]["uid"]
+                if match["player1"]["uid"] != active_uid
+                else match["player2"]["uid"]
+            )
+
+            try:
+                match = await MultiplayerMatchService.forfeit(expired_match_id, inactive_uid)
+            except HTTPException:
+                return
+
+            MultiplayerRealtimeService.clear_snapshot(expired_match_id)
+            await MultiplayerRealtimeService.broadcast(
+                expired_match_id,
+                "match_finished",
+                {
+                    "match_id": expired_match_id,
+                    "status": match["status"],
+                    "winner_uid": match["winner_uid"],
+                    "reason": "connect_timeout",
+                },
+            )
+
+        MultiplayerRealtimeService.schedule_match_start_timer(
+            match_id,
+            _forfeit_missing_start_player,
+        )
+
     async def _forfeit_after_grace(expired_match_id: int, expired_player_uid: str):
         try:
             match = await MultiplayerMatchService.forfeit(expired_match_id, expired_player_uid)
@@ -366,6 +431,7 @@ async def multiplayer_ws(websocket: WebSocket, match_id: int):
             "player_disconnected",
             {"match_id": match_id, "player_uid": player_uid},
         )
+        MultiplayerRealtimeService.cancel_match_start_timer(match_id)
         MultiplayerRealtimeService.schedule_disconnect_timer(
             match_id,
             player_uid,

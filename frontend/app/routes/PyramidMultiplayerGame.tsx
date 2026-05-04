@@ -110,6 +110,7 @@ export default function PyramidMultiplayerGame() {
   const [syncStatusText, setSyncStatusText] = useState<string>("");
   const [matchEndMessage, setMatchEndMessage] = useState<string>("");
   const [errorText, setErrorText] = useState<string>("");
+  const [matchReady, setMatchReady] = useState(false);
   const [connectedPlayers, setConnectedPlayers] = useState<Set<string>>(
     new Set(),
   );
@@ -212,13 +213,15 @@ export default function PyramidMultiplayerGame() {
     );
   }, [hasClaimedTiles, match, phase, remoteSnapshot]);
 
-  const multiplayerReady = bothPlayersConnected || hasGameplayEvidence;
+  const multiplayerReady =
+    matchReady || bothPlayersConnected || hasGameplayEvidence;
   const canControlCurrentTurn =
     mySide !== null && isMyTurn && gameState === "playing";
 
   useEffect(() => {
     if (match?.id) {
       setMatchEndMessage("");
+      setMatchReady(false);
     }
   }, [match?.id]);
 
@@ -383,7 +386,7 @@ export default function PyramidMultiplayerGame() {
 
       setPlayerUid(uid);
       setErrorText("");
-      
+
       // Get access token for API calls
       void (async () => {
         try {
@@ -689,6 +692,20 @@ export default function PyramidMultiplayerGame() {
           return;
         }
 
+        if (parsed.event === "both_players_connected") {
+          const playerUids = Array.isArray(parsed.payload.player_uids)
+            ? parsed.payload.player_uids.filter(
+                (item): item is string => typeof item === "string",
+              )
+            : [];
+
+          if (playerUids.length > 0) {
+            setConnectedPlayers(new Set(playerUids));
+          }
+          setMatchReady(true);
+          return;
+        }
+
         if (parsed.event === "player_disconnected") {
           const disconnectedUid =
             typeof parsed.payload.player_uid === "string"
@@ -702,6 +719,7 @@ export default function PyramidMultiplayerGame() {
               return next;
             });
           }
+          setMatchReady(false);
           return;
         }
 
@@ -753,6 +771,7 @@ export default function PyramidMultiplayerGame() {
       ws.close();
       socketRef.current = null;
       setConnectedPlayers(new Set());
+      setMatchReady(false);
     };
   }, [match?.id, token, playerUid]);
 
@@ -823,8 +842,6 @@ export default function PyramidMultiplayerGame() {
   return (
     <Container maxW="7xl" py={6}>
       <Stack gap={5}>
-
-
         <Flex justify="center" align="center" gap={3} flexWrap="wrap">
           <Box
             px={4}
