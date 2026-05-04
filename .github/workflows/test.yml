@@ -92,7 +92,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       
       - name: Start Docker Compose stack
-        run: docker compose -f QuizApp/docker-compose.yml up -d --build
+        run: docker compose -f docker-compose.yml up -d --build
       
       - name: Wait for services to be healthy
         run: |
@@ -137,14 +137,14 @@ jobs:
       
       - name: Collect Docker logs
         if: failure()
-        run: docker compose -f QuizApp/docker-compose.yml logs > docker-logs.txt
+        run: docker compose -f docker-compose.yml logs > docker-logs.txt
       
       - name: Upload Docker logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: docker-logs
-          path: QuizApp/docker-logs.txt
+          path: docker-logs.txt
           retention-days: 7
 
   test-summary:
