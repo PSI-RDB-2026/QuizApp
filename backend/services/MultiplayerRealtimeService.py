@@ -8,10 +8,14 @@ from fastapi import WebSocket
 class MultiplayerRealtimeService:
     _connections: dict[int, dict[str, WebSocket]] = {}
     _disconnect_tasks: dict[tuple[int, str], asyncio.Task] = {}
+    _match_start_tasks: dict[int, asyncio.Task] = {}
     _snapshots: dict[int, dict] = {}
 
     DISCONNECT_GRACE_SECONDS = int(
         os.getenv("MULTIPLAYER_DISCONNECT_GRACE_SECONDS", "30")
+    )
+    MATCH_START_GRACE_SECONDS = int(
+        os.getenv("MULTIPLAYER_MATCH_START_GRACE_SECONDS", "30")
     )
 
     @staticmethod
@@ -20,6 +24,18 @@ class MultiplayerRealtimeService:
         room = MultiplayerRealtimeService._connections.setdefault(match_id, {})
         room[player_uid] = websocket
         MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_uid)
+
+    @staticmethod
+    def get_connected_player_uids(match_id: int) -> set[str]:
+        room = MultiplayerRealtimeService._connections.get(match_id, {})
+        return set(room.keys())
+
+    @staticmethod
+    def has_both_players_connected(match_id: int, player_uids: set[str]) -> bool:
+        if len(player_uids) != 2:
+            return False
+        connected_player_uids = MultiplayerRealtimeService.get_connected_player_uids(match_id)
+        return player_uids.issubset(connected_player_uids)
 
     @staticmethod
     def disconnect(match_id: int, player_uid: str):
@@ -66,6 +82,26 @@ class MultiplayerRealtimeService:
         MultiplayerRealtimeService._snapshots.pop(match_id, None)
 
     @staticmethod
+    def cancel_match_start_timer(match_id: int):
+        task = MultiplayerRealtimeService._match_start_tasks.pop(match_id, None)
+        if task:
+            task.cancel()
+
+    @staticmethod
+    def schedule_match_start_timer(match_id: int, on_timeout):
+        async def timer_task():
+            try:
+                await asyncio.sleep(MultiplayerRealtimeService.MATCH_START_GRACE_SECONDS)
+                await on_timeout(match_id)
+            finally:
+                MultiplayerRealtimeService._match_start_tasks.pop(match_id, None)
+
+        MultiplayerRealtimeService.cancel_match_start_timer(match_id)
+        MultiplayerRealtimeService._match_start_tasks[match_id] = asyncio.create_task(
+            timer_task()
+        )
+
+    @staticmethod
     def cancel_disconnect_timer(match_id: int, player_uid: str):
         key = (match_id, player_uid)
         task = MultiplayerRealtimeService._disconnect_tasks.pop(key, None)
@@ -77,10 +113,17 @@ class MultiplayerRealtimeService:
         async def timer_task():
             try:
                 await asyncio.sleep(MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS)
-                await on_timeout(match_id, player_uid)
+                # Only execute forfeit if the player is still disconnected
+                room = MultiplayerRealtimeService._connections.get(match_id, {})
+                if player_uid not in room:
+                    # Player is still offline, trigger forfeit
+                    await on_timeout(match_id, player_uid)
             finally:
-                MultiplayerRealtimeService._disconnect_tasks.pop((match_id, player_uid), None)
+                MultiplayerRealtimeService._disconnect_tasks.pop(
+                    (match_id, player_uid), None
+                )
 
         key = (match_id, player_uid)
         MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_uid)
-        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(timer_task())
+        task = asyncio.ensure_future(timer_task())
+        MultiplayerRealtimeService._disconnect_tasks[key] = task

@@ -40,7 +40,9 @@ class MultiplayerMatchService:
     @staticmethod
     async def create_match(player1_uid: str, player2_uid: str) -> dict:
         if player1_uid == player2_uid:
-            raise HTTPException(status_code=400, detail="Cannot create match with the same player")
+            raise HTTPException(
+                status_code=400, detail="Cannot create match with the same player"
+            )
 
         player1 = await MultiplayerMatchService._get_user(player1_uid)
         player2 = await MultiplayerMatchService._get_user(player2_uid)
@@ -115,7 +117,9 @@ class MultiplayerMatchService:
     async def ensure_participant(match_id: int, player_uid: str) -> dict:
         match = await MultiplayerMatchService.get_match(match_id)
         if player_uid not in {match["player1"]["uid"], match["player2"]["uid"]}:
-            raise HTTPException(status_code=403, detail="You are not a participant in this match")
+            raise HTTPException(
+                status_code=403, detail="You are not a participant in this match"
+            )
         return match
 
     @staticmethod
@@ -292,7 +296,9 @@ class MultiplayerMatchService:
 
     @staticmethod
     async def forfeit(match_id: int, forfeited_uid: str) -> dict:
-        match = await MultiplayerMatchService.ensure_participant(match_id, forfeited_uid)
+        match = await MultiplayerMatchService.ensure_participant(
+            match_id, forfeited_uid
+        )
         if match["status"] != "ongoing":
             raise HTTPException(status_code=409, detail="Match is already finished")
 
@@ -301,4 +307,6 @@ class MultiplayerMatchService:
             if match["player1"]["uid"] == forfeited_uid
             else match["player1"]["uid"]
         )
-        return await MultiplayerMatchService.finalize_match(match_id, winner_uid, status="aborted")
+        return await MultiplayerMatchService.finalize_match(
+            match_id, winner_uid, status="aborted"
+        )

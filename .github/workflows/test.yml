@@ -36,6 +36,8 @@ jobs:
         with:
           files: ./backend/coverage.xml
           flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: PSI-RDB-2026/QuizApp
           name: backend-coverage
           fail_ci_if_error: false
 
@@ -66,32 +68,145 @@ jobs:
         with:
           files: ./frontend/coverage/coverage-final.json
           flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: PSI-RDB-2026/QuizApp
           name: frontend-coverage
           fail_ci_if_error: false
+
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: quizapp-backend:latest
+          secrets: |
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            FIREBASE_PRIVATE_KEY_ID=${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
+            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+            FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+            FIREBASE_CLIENT_ID=${{ secrets.FIREBASE_CLIENT_ID }}
+            FIREBASE_AUTH_URI=${{ secrets.FIREBASE_AUTH_URI }}
+            FIREBASE_TOKEN_URI=${{ secrets.FIREBASE_TOKEN_URI }}
+            FIREBASE_AUTH_PROVIDER_X509_CERT_URL=${{ secrets.FIREBASE_AUTH_PROVIDER_X509_CERT_URL }}
+            FIREBASE_CLIENT_X509_CERT_URL=${{ secrets.FIREBASE_CLIENT_X509_CERT_URL }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}
+      
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: quizapp-frontend:latest
+          build-args: |
+            VITE_API_URL=/api
+          secrets: |
+            FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+            FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+            FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+            FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+            FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+            FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
+      
+      - name: Start Docker Compose stack
+        run: docker compose up -d
+      
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to start..."
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f http://localhost/api/health/db > /dev/null 2>&1; then
+              echo " Backend is ready"
+              break
+            fi
+            attempt=$((attempt+1))
+            echo "Attempt $attempt/$max_attempts - waiting for backend..."
+            sleep 2
+          done
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo " Backend failed to start"
+            docker compose logs
+            exit 1
+          fi
+      
+      - name: Run E2E tests
+        working-directory: ./frontend
+        run: npm run test:e2e
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+      
+      - name: Upload test videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-videos
+          path: frontend/test-results/
+          retention-days: 7
+      
+      - name: Collect Docker logs
+        if: failure()
+        run: docker compose -f docker-compose.yml logs > docker-logs.txt
+      
+      - name: Upload Docker logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-logs.txt
+          retention-days: 7
 
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, e2e-tests]
     if: always()
     
     steps:
       - name: Report Status
         run: |
-          echo "✅ Test suite completed"
+          echo " Test suite completed"
           echo "Backend tests: ${{ needs.backend-tests.result }}"
           echo "Frontend tests: ${{ needs.frontend-tests.result }}"
+          echo "E2E tests: ${{ needs.e2e-tests.result }}"
           
-          if [ "${{ needs.backend-tests.result }}" = "failure" ] || [ "${{ needs.frontend-tests.result }}" = "failure" ]; then
-            echo "❌ One or more test suites failed"
+          if [ "${{ needs.backend-tests.result }}" = "failure" ] || [ "${{ needs.frontend-tests.result }}" = "failure" ] || [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
+            echo " One or more test suites failed"
             exit 1
           fi
-
-# TODO: Customize before enabling in production
-# - Add environment variables for database testing
-# - Configure codecov thresholds and badges
-# - Set up branch protection rules requiring passing tests
-# - Add performance benchmarking jobs if needed
-# - Configure auto-deployment on main branch if tests pass
-# - Add PR comments with coverage change information
-# - Set up Secret scanning for credentials in tests

@@ -138,6 +138,7 @@ export default function PyramidLocalGame() {
             key={`${phase}-${activeChallenge.question.id}`}
             open={phase === "answering" || phase === "stealing"}
             playerLabel={PLAYER_META[activeChallenge.answerPlayer].label}
+            playerSide={activeChallenge.answerPlayer}
             question={activeChallenge.question}
             remainingSeconds={questionSeconds}
             totalSeconds={ANSWER_SECONDS}

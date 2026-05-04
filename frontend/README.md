@@ -42,6 +42,28 @@ Create a production build:
 npm run build
 ```
 
+## End-to-End Testing
+
+Playwright smoke tests run against the local stack exposed through the nginx proxy on port 80.
+
+Start the full app from the repository root:
+
+```bash
+docker compose up --build
+```
+
+Then run the browser tests from `frontend/`:
+
+```bash
+npm run test:e2e
+```
+
+If you want to watch the browser while debugging:
+
+```bash
+npm run test:e2e:headed
+```
+
 ## Deployment
 
 ### Docker Deployment
