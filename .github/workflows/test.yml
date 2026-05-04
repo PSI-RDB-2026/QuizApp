@@ -10,66 +10,64 @@ jobs:
   backend-tests:
     name: Backend Tests (Python)
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
           cache: "pip"
-      
+
       - name: Install backend dependencies
         working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      
+
       - name: Run backend tests
         working-directory: ./backend
         run: |
           pytest tests/ -v --cov=services --cov=routers --cov-report=term-missing --cov-report=xml
-      
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         with:
           files: ./backend/coverage.xml
           flags: backend
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: PSI-RDB-2026/QuizApp
           name: backend-coverage
           fail_ci_if_error: false
 
   frontend-tests:
     name: Frontend Tests (Node.js)
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
-      
+
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
-      
+
       - name: Run frontend tests
         working-directory: ./frontend
         run: npm run test:ci
-      
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         with:
           files: ./frontend/coverage/coverage-final.json
           flags: frontend
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: PSI-RDB-2026/QuizApp
           name: frontend-coverage
           fail_ci_if_error: false
 
@@ -78,14 +76,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests]
     if: always()
-    
+
     steps:
       - name: Report Status
         run: |
           echo "✅ Test suite completed"
           echo "Backend tests: ${{ needs.backend-tests.result }}"
           echo "Frontend tests: ${{ needs.frontend-tests.result }}"
-          
+
           if [ "${{ needs.backend-tests.result }}" = "failure" ] || [ "${{ needs.frontend-tests.result }}" = "failure" ]; then
             echo "❌ One or more test suites failed"
             exit 1
