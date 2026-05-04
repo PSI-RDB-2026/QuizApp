@@ -825,8 +825,6 @@ sequenceDiagram
     GHActions->>GHActions: Build frontend Docker image
     GHActions->>Azure: Push images to Azure Container Registry
     Azure->>DEV: Spin up container instances
-
-    end
 ```
 
 **Pipeline stages:**
