@@ -9,23 +9,44 @@ class QuestionsService:
     @staticmethod
     async def get_rand_question(
         question_type: Literal["standard", "yes_no"] = "standard",
+        excluded_ids: list[int] | None = None,
     ) -> dict | None:
-        """Returns one random question, filtered by type."""
+        """Returns one random question, filtered by type and excluding previously used questions."""
+
+        excluded_ids = excluded_ids or []
 
         if question_type == "standard":
-            question = await fetch_one("""
-                SELECT id, question_text, initials, correct_answer, category, difficulty
-                FROM standard_questions
-                ORDER BY RANDOM()
-                LIMIT 1
-                """)
+            if excluded_ids:
+                question = await fetch_one("""
+                    SELECT id, question_text, initials, correct_answer, category, difficulty
+                    FROM standard_questions
+                    WHERE id != ALL(:excluded_ids)
+                    ORDER BY RANDOM()
+                    LIMIT 1
+                    """, {"excluded_ids": excluded_ids})
+            else:
+                question = await fetch_one("""
+                    SELECT id, question_text, initials, correct_answer, category, difficulty
+                    FROM standard_questions
+                    ORDER BY RANDOM()
+                    LIMIT 1
+                    """)
         elif question_type == "yes_no":
-            question = await fetch_one("""
-                SELECT id, question_text, correct_answer, category
-                FROM yes_no_questions
-                ORDER BY RANDOM()
-                LIMIT 1
-                """)
+            if excluded_ids:
+                question = await fetch_one("""
+                    SELECT id, question_text, correct_answer, category
+                    FROM yes_no_questions
+                    WHERE id != ALL(:excluded_ids)
+                    ORDER BY RANDOM()
+                    LIMIT 1
+                    """, {"excluded_ids": excluded_ids})
+            else:
+                question = await fetch_one("""
+                    SELECT id, question_text, correct_answer, category
+                    FROM yes_no_questions
+                    ORDER BY RANDOM()
+                    LIMIT 1
+                    """)
 
         if not question:
             return None
