@@ -1,6 +1,6 @@
 """Integration tests for multiplayer router with service-layer mocks."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -35,6 +35,7 @@ def mock_multiplayer_services(monkeypatch):
         }
 
     async def fake_join_or_match(uid: str, username: str, elo_rating: int, game_mode: str):
+        _ = (username, elo_rating)
         if uid == "player1-uid":
             return MatchmakingResult(
                 status="queued",
@@ -52,13 +53,14 @@ def mock_multiplayer_services(monkeypatch):
                 elo_rating=1200,
                 game_mode=game_mode,
                 joined_at=datetime.now(),
+                last_seen_at=datetime.now(timezone.utc),
             ),
         )
 
-    async def fake_leave_queue(uid: str):
+    async def fake_leave_queue(_uid: str):
         return True
 
-    async def fake_get_queue_status(uid: str):
+    async def fake_get_queue_status(_uid: str):
         return {
             "in_queue": True,
             "queue_position": 1,
@@ -114,6 +116,7 @@ def mock_multiplayer_services(monkeypatch):
         return await fake_get_match(match_id)
 
     async def fake_submit_turn(match_id: int, player_uid: str, tile_id: int, question_type: str, question_id: int, is_correct: bool):
+        _ = player_uid
         return {
             "match_id": match_id,
             "tile_id": tile_id,
@@ -124,7 +127,7 @@ def mock_multiplayer_services(monkeypatch):
             "player2_score": 1,
         }
 
-    async def fake_forfeit(match_id: int, forfeited_uid: str):
+    async def fake_forfeit(match_id: int, _forfeited_uid: str):
         return {
             "id": match_id,
             "status": "aborted",
@@ -145,19 +148,31 @@ def mock_multiplayer_services(monkeypatch):
             "player2_score": 4,
         }
 
-    async def fake_broadcast(match_id: int, event: str, payload: dict):
+    async def fake_broadcast(_match_id: int, _event: str, _payload: dict):
         return None
 
-    async def fake_send_to_player(match_id: int, player_uid: str, event: str, payload: dict):
+    async def fake_send_to_player(_match_id: int, _player_uid: str, _event: str, _payload: dict):
         return None
 
-    async def fake_connect(match_id: int, player_uid: str, websocket):
+    def fake_has_both_players_connected(_match_id: int, _player_uids: set[str]):
+        return True
+
+    def fake_get_connected_player_uids(_match_id: int):
+        return {"player1-uid", "player2-uid"}
+
+    def fake_cancel_match_start_timer(_match_id: int):
+        return None
+
+    def fake_schedule_match_start_timer(_match_id: int, _on_timeout):
+        return None
+
+    async def fake_connect(_match_id: int, _player_uid: str, websocket):
         await websocket.accept()
 
-    def fake_disconnect(match_id: int, player_uid: str):
+    def fake_disconnect(_match_id: int, _player_uid: str):
         return None
 
-    def fake_schedule_disconnect_timer(match_id: int, player_uid: str, on_timeout):
+    def fake_schedule_disconnect_timer(_match_id: int, _player_uid: str, _on_timeout):
         return None
 
     monkeypatch.setattr(UserServices, "get_user_from_token", staticmethod(fake_get_user_from_token))
@@ -176,6 +191,10 @@ def mock_multiplayer_services(monkeypatch):
     monkeypatch.setattr(MultiplayerMatchService, "forfeit", staticmethod(fake_forfeit))
     monkeypatch.setattr(MultiplayerRealtimeService, "broadcast", staticmethod(fake_broadcast))
     monkeypatch.setattr(MultiplayerRealtimeService, "send_to_player", staticmethod(fake_send_to_player))
+    monkeypatch.setattr(MultiplayerRealtimeService, "has_both_players_connected", staticmethod(fake_has_both_players_connected))
+    monkeypatch.setattr(MultiplayerRealtimeService, "get_connected_player_uids", staticmethod(fake_get_connected_player_uids))
+    monkeypatch.setattr(MultiplayerRealtimeService, "cancel_match_start_timer", staticmethod(fake_cancel_match_start_timer))
+    monkeypatch.setattr(MultiplayerRealtimeService, "schedule_match_start_timer", staticmethod(fake_schedule_match_start_timer))
     monkeypatch.setattr(MultiplayerRealtimeService, "connect", staticmethod(fake_connect))
     monkeypatch.setattr(MultiplayerRealtimeService, "disconnect", staticmethod(fake_disconnect))
     monkeypatch.setattr(MultiplayerRealtimeService, "schedule_disconnect_timer", staticmethod(fake_schedule_disconnect_timer))
@@ -254,3 +273,20 @@ class TestMultiplayerWebSocket:
     def test_ws_accepts_valid_token(self, test_client):
         with test_client.websocket_connect("/api/multiplayer/ws/77?token=valid-token") as websocket:
             assert websocket is not None
+
+    def test_ws_broadcasts_both_players_connected_event(self, test_client, monkeypatch):
+        events: list[str] = []
+
+        async def capture_broadcast(_match_id: int, event: str, _payload: dict):
+            events.append(event)
+
+        monkeypatch.setattr(
+            MultiplayerRealtimeService,
+            "broadcast",
+            staticmethod(capture_broadcast),
+        )
+
+        with test_client.websocket_connect("/api/multiplayer/ws/77?token=valid-token"):
+            pass
+
+        assert "both_players_connected" in events
