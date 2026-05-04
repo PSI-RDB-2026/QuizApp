@@ -20,6 +20,7 @@ type Mode = "answer" | "steal";
 interface Props {
   open: boolean;
   playerLabel: string;
+  playerSide?: "player1" | "player2";
   question: QuestionResponse;
   remainingSeconds: number;
   totalSeconds: number;
@@ -31,6 +32,7 @@ interface Props {
 export default function StandardQuestionModal({
   open,
   playerLabel,
+  playerSide,
   question,
   remainingSeconds,
   totalSeconds,
@@ -135,7 +137,9 @@ export default function StandardQuestionModal({
                   />
                   <HStack justify="end">
                     <Button
-                      colorPalette="blue"
+                      colorPalette={
+                        playerSide === "player1" ? "blue" : "orange"
+                      }
                       onClick={() => void submit()}
                       loading={submitting}
                       disabled={!interactive || submitting || !answer.trim()}

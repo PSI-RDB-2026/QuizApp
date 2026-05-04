@@ -118,6 +118,7 @@ export default function PyramidMultiplayerGame() {
   const socketRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<number | null>(null);
   const lastBroadcastSnapshotRef = useRef<string>("");
+  const leaveForfeitSentRef = useRef(false);
   const [timersEnabled, setTimersEnabled] = useState(false);
   const websocketUrl =
     match && token ? getMultiplayerWebSocketUrl(match.id, token) : "";
@@ -220,6 +221,10 @@ export default function PyramidMultiplayerGame() {
     if (match?.id) {
       setMatchEndMessage("");
     }
+  }, [match?.id]);
+
+  useEffect(() => {
+    leaveForfeitSentRef.current = false;
   }, [match?.id]);
 
   useEffect(() => {
@@ -383,7 +388,7 @@ export default function PyramidMultiplayerGame() {
 
       setPlayerUid(uid);
       setErrorText("");
-      
+
       // Get access token for API calls
       void (async () => {
         try {
@@ -537,6 +542,12 @@ export default function PyramidMultiplayerGame() {
       setSyncStatusText("Realtime connected.");
       lastBroadcastSnapshotRef.current = "";
       ws.send(JSON.stringify({ type: "state_request" }));
+      ws.send(
+        JSON.stringify({
+          type: "game_snapshot",
+          snapshot: currentSnapshotRef.current,
+        }),
+      );
     };
 
     ws.onmessage = (event) => {
@@ -715,21 +726,25 @@ export default function PyramidMultiplayerGame() {
             typeof parsed.payload.reason === "string"
               ? parsed.payload.reason
               : "";
-          const winnerEmail =
-            typeof parsed.payload.winner_email === "string"
-              ? parsed.payload.winner_email
+          const winnerUid =
+            typeof parsed.payload.winner_uid === "string"
+              ? parsed.payload.winner_uid
               : "";
 
           if (
             finishedReason === "forfeit" ||
             finishedReason === "disconnect_timeout"
           ) {
-            const forfeitedLabel =
-              winnerEmail && match
-                ? winnerEmail === match.player1.email
-                  ? match.player2.username
-                  : match.player1.username
-                : "The other player";
+            const winnerMatchesPlayer1 = !!(
+              match &&
+              winnerUid &&
+              winnerUid === match.player1.uid
+            );
+            const forfeitedLabel = match
+              ? winnerMatchesPlayer1
+                ? match.player2.username
+                : match.player1.username
+              : "The other player";
 
             setMatchEndMessage(
               finishedReason === "forfeit"
@@ -766,12 +781,14 @@ export default function PyramidMultiplayerGame() {
       return;
     }
 
+    leaveForfeitSentRef.current = true;
+
     const response = await forfeitMultiplayerMatch(token, match.id);
-    if ("winner_email" in response) {
+    if ("winner_uid" in response) {
       setSyncStatusText("You forfeited the match.");
       setMatchEndMessage(
         `${
-          response.winner_email === match.player1.email
+          response.winner_uid === match.player1.uid
             ? match.player1.username
             : match.player2.username
         } wins because the other player forfeited.`,
@@ -785,17 +802,41 @@ export default function PyramidMultiplayerGame() {
     concedeCurrentTurn();
   };
 
+  useEffect(() => {
+    if (!token || !match) {
+      return;
+    }
+
+    const sendLeaveForfeit = () => {
+      if (leaveForfeitSentRef.current || gameState !== "playing") {
+        return;
+      }
+
+      leaveForfeitSentRef.current = true;
+
+      void fetch(`/api/multiplayer/matches/${match.id}/forfeit`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        keepalive: true,
+      });
+    };
+
+    const handlePageHide = () => {
+      sendLeaveForfeit();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [gameState, match, token]);
+
   if (errorText) {
     return (
       <Container maxW="container.lg" py={8}>
         <Stack gap={4}>
-          <Button
-            onClick={() => navigate("/")}
-            variant="surface"
-            colorPalette="green"
-          >
-            &larr; Back to Main Menu
-          </Button>
           <Text color="red.500">{errorText}</Text>
         </Stack>
       </Container>
@@ -806,13 +847,6 @@ export default function PyramidMultiplayerGame() {
     return (
       <Container maxW="container.lg" py={8}>
         <Stack gap={4} align="center">
-          <Button
-            onClick={() => navigate("/")}
-            variant="surface"
-            colorPalette="green"
-          >
-            &larr; Back to Main Menu
-          </Button>
           <Spinner size="lg" />
           <Text>{queueStatusText}</Text>
         </Stack>
@@ -823,8 +857,6 @@ export default function PyramidMultiplayerGame() {
   return (
     <Container maxW="7xl" py={6}>
       <Stack gap={5}>
-
-
         <Flex justify="center" align="center" gap={3} flexWrap="wrap">
           <Box
             px={4}
@@ -929,6 +961,7 @@ export default function PyramidMultiplayerGame() {
             key={`${phase}-${activeChallenge.question.id}`}
             open={phase === "answering" || phase === "stealing"}
             playerLabel={PLAYER_META[activeChallenge.answerPlayer].label}
+            playerSide={activeChallenge.answerPlayer}
             question={activeChallenge.question}
             remainingSeconds={questionSeconds}
             totalSeconds={ANSWER_SECONDS}
@@ -983,11 +1016,11 @@ export default function PyramidMultiplayerGame() {
       <GameOverModal
         open={
           gameState === "ended" ||
-          (match.status !== "ongoing" && Boolean(match.winner_email))
+          (match.status !== "ongoing" && Boolean(match.winner_uid))
         }
         winnerLabel={
-          match.winner_email
-            ? match.winner_email === match.player1.email
+          match.winner_uid
+            ? match.winner_uid === match.player1.uid
               ? match.player1.username
               : match.player2.username
             : gameResult

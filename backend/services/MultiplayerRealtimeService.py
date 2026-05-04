@@ -77,10 +77,17 @@ class MultiplayerRealtimeService:
         async def timer_task():
             try:
                 await asyncio.sleep(MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS)
-                await on_timeout(match_id, player_uid)
+                # Only execute forfeit if the player is still disconnected
+                room = MultiplayerRealtimeService._connections.get(match_id, {})
+                if player_uid not in room:
+                    # Player is still offline, trigger forfeit
+                    await on_timeout(match_id, player_uid)
             finally:
-                MultiplayerRealtimeService._disconnect_tasks.pop((match_id, player_uid), None)
+                MultiplayerRealtimeService._disconnect_tasks.pop(
+                    (match_id, player_uid), None
+                )
 
         key = (match_id, player_uid)
         MultiplayerRealtimeService.cancel_disconnect_timer(match_id, player_uid)
-        MultiplayerRealtimeService._disconnect_tasks[key] = asyncio.create_task(timer_task())
+        task = asyncio.ensure_future(timer_task())
+        MultiplayerRealtimeService._disconnect_tasks[key] = task
