@@ -44,12 +44,9 @@ flowchart LR
 ```mermaid
 erDiagram
     USERS {
-        varchar email PK
+        varchar firebase_uid PK
         varchar username UK
-        varchar password_hash
-        varchar google_id
         int elo_rating
-        timestamp created_at
     }
 
     STANDARD_QUESTIONS {
