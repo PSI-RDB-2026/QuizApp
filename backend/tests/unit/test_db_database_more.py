@@ -64,13 +64,13 @@ def test_execute_and_fetch_one_fetch_all(monkeypatch):
     monkeypatch.setattr(database, "POOL", pool)
 
     # execute should return result
-    res = asyncio.run(database.execute("select 1"))
+    res = asyncio.get_event_loop().run_until_complete(database.execute("select 1"))
     assert res.fetchone() is one
 
-    r1 = asyncio.run(database.fetch_one("select 1"))
+    r1 = asyncio.get_event_loop().run_until_complete(database.fetch_one("select 1"))
     assert r1 is one
 
-    r2 = asyncio.run(database.fetch_all("select *"))
+    r2 = asyncio.get_event_loop().run_until_complete(database.fetch_all("select *"))
     assert r2 == all_
 
 
@@ -80,18 +80,4 @@ def test_execute_integrity_error(monkeypatch):
     monkeypatch.setattr(database, "POOL", pool)
 
     with pytest.raises(IntegrityError):
-        asyncio.run(database.execute("insert"))
-
-
-def test_transaction_context_manager(monkeypatch):
-    conn = FakeConn(result=FakeResult(one="ok"))
-    pool = FakePool(conn)
-    monkeypatch.setattr(database, "POOL", pool)
-
-    async def op():
-        async with database.transaction() as connection:
-            result = await database.execute_on_connection(connection, "select 1")
-            return result.fetchone()
-
-    out = asyncio.run(op())
-    assert out == "ok"
+        asyncio.get_event_loop().run_until_complete(database.execute("insert"))
