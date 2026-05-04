@@ -46,7 +46,7 @@ erDiagram
     USERS {
         varchar firebase_uid PK
         varchar username UK
-        int elo_rating
+        int elo_rating "Leaderboard rank"
     }
 
     STANDARD_QUESTIONS {
@@ -55,7 +55,7 @@ erDiagram
         text question_text UK
         varchar correct_answer
         varchar category
-        int difficulty
+        int difficulty "1 to 5"
     }
 
     YES_NO_QUESTIONS {
@@ -72,7 +72,7 @@ erDiagram
         varchar winner_id FK
         int player1_elo_change
         int player2_elo_change
-        varchar status
+        varchar status "ongoing|completed|aborted"
         timestamp started_at
         timestamp finished_at
     }
@@ -81,7 +81,7 @@ erDiagram
         bigint id PK
         bigint match_id FK
         varchar player_id FK
-        int tile_id
+        int tile_id "1-28"
         int standard_question_id FK
         int yes_no_question_id FK
         boolean is_correct
@@ -97,63 +97,163 @@ erDiagram
     YES_NO_QUESTIONS o|--o{ MATCH_TURNS : appears_in
 ```
 
-Constraint: each turn references exactly one question type (`standard_question_id` xor `yes_no_question_id`).
+**Key Constraints:**
 
-Original DB diagrama is in [/diagrams/DB-diagram.md](../diagrams/DB-diagram.png)
+- Each turn references exactly one question type: `standard_question_id` XOR `yes_no_question_id` (enforced via CHECK constraint).
+- Match status is restricted to `ongoing`, `completed`, or `aborted`.
+- **Leaderboard**: Derived from the `users` table ordered by `elo_rating` DESC. No separate leaderboard table is needed; the API endpoint `GET /api/users/leaderboard` queries and ranks users directly.
+
+Original DB diagram is in [/diagrams/DB-diagram.md](../diagrams/DB-diagram.png)
 
 ## Interaction Design
 
 ### Single-Player Mode
 
 ```mermaid
-flowchart LR
-    Browser[Browser]
-    Backend[Backend]
-    DB[(Database)]
+sequenceDiagram
+    actor Player as Player
+    participant Frontend as Frontend
+    participant Backend as Backend
+    participant DB as Database
 
-    Browser -->|HTTP: Login, Get Quiz| Backend
-    Browser -->|HTTP: Check Answer| Backend
-    Browser -->|HTTP: Submit answers| Backend
+    Player->>Frontend: Opens app / logs in
+    Frontend->>Backend: GET /api/questions?question_type=standard
+    Backend->>DB: SELECT random question
+    DB-->>Backend: Question row
+    Backend-->>Frontend: 200 + Question JSON
+    Frontend-->>Player: Display question
 
-    DB -->|Load Questions| Backend
+    Player->>Frontend: Submit answer (local)
+    Frontend->>Backend: POST /api/questions/check
+    Backend->>DB: Query correct answer
+    DB-->>Backend: Answer + metadata
+    Backend-->>Frontend: 200 + is_correct, correct_answer
+    Frontend-->>Player: Display result
 
-    Backend ~~~ DB
-
-    Backend -->|HTTP: Results| Browser
-
-
+    Player->>Frontend: Submit all answers
+    Frontend-->>Player: Show score & summary
 ```
 
-**Communication:** HTTP/REST only. Answers stored locally, submitted once.
+**Communication:** HTTP/REST only. Answers are evaluated locally or checked one-at-a-time. Client may submit collected results after quiz completion.
 
-### Multiplayer Mode
+### Multiplayer Mode - Match Setup
 
 ```mermaid
-flowchart LR
-    P1[Player 1]
-    P2[Player 2]
-    Backend[Backend]
-    DB[(Database)]
+sequenceDiagram
+    actor P1 as Player 1
+    actor P2 as Player 2
+    participant Frontend1 as Frontend P1
+    participant Frontend2 as Frontend P2
+    participant Backend as Backend
+    participant Matchmaker as Matchmaking<br/>Service
+    participant DB as Database
 
-    P1 -->|HTTP: Create match| Backend
+    P1->>Frontend1: Join queue
+    Frontend1->>Backend: POST /api/multiplayer/queue/join
+    Backend->>Matchmaker: Add to queue (game_mode, elo_window)
+    Matchmaker->>DB: Lookup ranked players
+    Matchmaker-->>Backend: status: "queued"
+    Backend-->>Frontend1: 200 + queue_position, elo_window
 
-    P2 -->|HTTP: Accept match| Backend
+    P2->>Frontend2: Join queue
+    Frontend2->>Backend: POST /api/multiplayer/queue/join
+    Backend->>Matchmaker: Add to queue
+    Matchmaker->>DB: Match found (Elo within window)
+    Matchmaker->>DB: INSERT match row → match_id
+    Matchmaker-->>Backend: status: "matched", match_id, opponent info
+    Backend-->>Frontend2: 200 + matched_match_id, opponent
 
-    P1 <-->|WebSocket: Connect| Backend
-    P2 <-->|WebSocket: Connect| Backend
+    Frontend1->>Backend: Poll GET /api/multiplayer/queue/status
+    Backend->>Matchmaker: Check queue status
+    Matchmaker-->>Backend: Match exists for player
+    Backend-->>Frontend1: 200 + matched_match_id, opponent
 
-    P1 -->|HTTP: Submit answer| Backend
-    Backend -->|Save| DB
-    Backend -->|WebSocket: Score update| P2
-    P1 -->|HTTP: Check Answer| Backend
-    P2 -->|HTTP: Check Answer| Backend
-
-    P2 -->|HTTP: Submit answer| Backend
-    DB -->|Load Question| Backend
-    Backend -->|WebSocket: Score update| P1
+    Frontend1->>Backend: GET /api/multiplayer/matches/{match_id}
+    Backend->>DB: SELECT match state
+    DB-->>Backend: Match + participants
+    Backend-->>Frontend1: 200 + MatchStateResponse
+    Frontend1-->>P1: Display opponent, ready to play
 ```
 
-**Communication:** HTTP/REST for setup and answers. WebSocket for real-time score updates.
+### Multiplayer Mode - Real-Time Gameplay via WebSocket
+
+```mermaid
+sequenceDiagram
+    actor P1 as Player 1
+    actor P2 as Player 2
+    participant FE1 as Frontend P1
+    participant FE2 as Frontend P2
+    participant Backend as Backend
+    participant WS1 as WebSocket<br/>P1 connection
+    participant WS2 as WebSocket<br/>P2 connection
+    participant Realtime as Realtime<br/>Service
+    participant DB as Database
+
+    FE1->>WS1: ws://.../multiplayer/ws/{match_id}?token=<jwt>
+    WS1->>Backend: [WebSocket Handshake]
+    Backend->>Backend: Verify token → resolve user
+    Backend->>DB: Verify participant in match
+    Backend->>Realtime: Register P1 connection
+    Backend->>WS1: Accept ✓
+
+    FE2->>WS2: ws://.../multiplayer/ws/{match_id}?token=<jwt>
+    WS2->>Backend: [WebSocket Handshake]
+    Backend->>Realtime: Register P2 connection
+    Realtime->>WS1: Broadcast "player_connected" (P2)
+    Realtime->>WS2: Broadcast "player_connected" (P1)
+    WS1-->>FE1: player_connected event
+    WS2-->>FE2: player_connected event
+
+    FE1->>FE1: Fetch question, present to player
+    P1->>FE1: Select answer & submit
+    FE1->>Backend: POST /api/multiplayer/matches/{match_id}/turn
+    activate Backend
+    Backend->>DB: INSERT match_turn record
+    Backend->>Backend: Recalculate scores
+    Backend->>Realtime: Broadcast score_updated + game_snapshot
+    deactivate Backend
+    Realtime->>WS1: score_updated (P1's own result)
+    Realtime->>WS2: score_updated (opponent's result)
+    WS1-->>FE1: Update P1 score
+    WS2-->>FE2: Update P2 score
+
+    par Player 2 Turn
+        P2->>FE2: Submit answer
+        FE2->>Backend: POST /api/multiplayer/matches/{match_id}/turn
+        activate Backend
+        Backend->>DB: INSERT match_turn record
+        Backend->>Realtime: Broadcast score_updated
+        deactivate Backend
+        Realtime->>WS1: score_updated
+        Realtime->>WS2: score_updated
+    end
+
+    rect rgb(200, 150, 255)
+    note over FE1,FE2: Match Completion
+    Backend->>DB: Check if both players completed 28 turns
+    DB-->>Backend: Match finished (28 turns per player)
+    Backend->>DB: UPDATE matches SET status='completed', winner_id, finished_at
+    Backend->>Realtime: Broadcast match_finished + final scores + Elo changes
+    Realtime->>WS1: match_finished event
+    Realtime->>WS2: match_finished event
+    WS1-->>FE1: Show match summary & opponent stats
+    WS2-->>FE2: Show match summary & opponent stats
+    end
+
+    FE1->>WS1: Close WebSocket
+    FE2->>WS2: Close WebSocket
+    WS1->>Realtime: Unregister connection
+    WS2->>Realtime: Unregister connection
+```
+
+**WebSocket Features:**
+
+- **Token validation**: Token passed via `?token=<jwt>` or `Authorization: Bearer <jwt>` header; invalid tokens close the connection with code `1008`.
+- **Inbound messages**: `ping`, `state_request`, `game_snapshot`, `timer_update`.
+- **Outbound events**: `match_snapshot`, `game_snapshot`, `player_connected`, `player_disconnected`, `score_updated`, `match_finished`, `error`.
+- **Real-time sync**: Score updates and game snapshots are broadcast instantly to both players.
+
+**Communication:** HTTP/REST for setup and turn submission; WebSocket for real-time events. Turn results are submitted via HTTP, but the WebSocket notifies both players immediately.
 
 ## API & Interface Specification
 
@@ -279,25 +379,29 @@ Behavior:
 
 Example responses:
 
-```text
-GET /api/questions?question_type=standard
-200 -> {
-    "id": 12,
-    "question_type": "standard",
-    "question_text": "What is the tallest mountain on Earth?",
-    "initials": "ME",
-    "category": "Geography",
-    "difficulty": 1
+```json
+// GET /api/questions?question_type=standard
+// 200 Response
+{
+  "id": 12,
+  "question_type": "standard",
+  "question_text": "What is the tallest mountain on Earth?",
+  "initials": "ME",
+  "category": "Geography",
+  "difficulty": 1
 }
+```
 
-GET /api/questions?question_type=yes_no
-200 -> {
-    "id": 8,
-    "question_type": "yes_no",
-    "question_text": "Is the hummingbird the smallest bird?",
-    "initials": null,
-    "category": "Nature",
-    "difficulty": null
+```json
+// GET /api/questions?question_type=yes_no
+// 200 Response
+{
+  "id": 8,
+  "question_type": "yes_no",
+  "question_text": "Is the hummingbird the smallest bird?",
+  "initials": null,
+  "category": "Nature",
+  "difficulty": null
 }
 ```
 
@@ -325,14 +429,36 @@ Behavior:
 
 Example requests:
 
-```text
-POST /api/questions/check
-{ "question_id": 12, "answer": "Mount Everest", "question_type": "standard" }
-200 -> { "is_correct": true, "correct_answer": "Mount Everest" }
+```json
+// POST /api/questions/check
+// Request body - Standard Question
+{
+  "question_id": 12,
+  "answer": "Mount Everest",
+  "question_type": "standard"
+}
 
-POST /api/questions/check
-{ "question_id": 8, "answer": true, "question_type": "yes_no" }
-200 -> { "is_correct": true, "correct_answer": true }
+// 200 Response
+{
+  "is_correct": true,
+  "correct_answer": "Mount Everest"
+}
+```
+
+```json
+// POST /api/questions/check
+// Request body - Yes/No Question
+{
+  "question_id": 8,
+  "answer": true,
+  "question_type": "yes_no"
+}
+
+// 200 Response
+{
+  "is_correct": true,
+  "correct_answer": true
+}
 ```
 
 ### Multiplayer API
@@ -370,6 +496,36 @@ Response model: `QueueJoinResponse`
 | `opponent_username` | `string` or `null`    | Present when matched      |
 | `elo_window`        | `int`                 | Matchmaking window size   |
 
+Example request and responses:
+
+```json
+// POST /api/multiplayer/queue/join
+// Request body
+{
+  "game_mode": "pyramid"
+}
+
+// 200 Response (queued)
+{
+  "status": "queued",
+  "queue_position": 3,
+  "matched_match_id": null,
+  "opponent_uid": null,
+  "opponent_username": null,
+  "elo_window": 100
+}
+
+// 200 Response (matched immediately)
+{
+  "status": "matched",
+  "queue_position": null,
+  "matched_match_id": 456,
+  "opponent_uid": "opponent-uuid",
+  "opponent_username": "OpponentName",
+  "elo_window": 100
+}
+```
+
 #### Queue status
 
 Response model: `QueueStatusResponse`
@@ -381,6 +537,29 @@ Response model: `QueueStatusResponse`
 | `waited_seconds`   | `int`           | Seconds spent waiting                |
 | `elo_window`       | `int` or `null` | Active Elo search window             |
 | `matched_match_id` | `int` or `null` | Set when a match already exists      |
+
+Example response:
+
+```json
+// GET /api/multiplayer/queue/status
+// 200 Response (still in queue)
+{
+  "in_queue": true,
+  "queue_position": 2,
+  "waited_seconds": 45,
+  "elo_window": 150,
+  "matched_match_id": null
+}
+
+// 200 Response (match found)
+{
+  "in_queue": false,
+  "queue_position": null,
+  "waited_seconds": 62,
+  "elo_window": 150,
+  "matched_match_id": 456
+}
+```
 
 #### Match state
 
@@ -394,6 +573,34 @@ Response model: `MatchStateResponse`
 | `winner_uid`                      | `string` or `null`                   | Winner UID when match ended |
 | `player1_score` / `player2_score` | `int`                                | Current score               |
 | `started_at` / `finished_at`      | `datetime` or `null`                 | Timestamps                  |
+
+Example response:
+
+```json
+// GET /api/multiplayer/matches/123
+// 200 Response
+{
+  "id": 123,
+  "status": "ongoing",
+  "player1": {
+    "uid": "player-1-uuid",
+    "username": "Player1",
+    "elo_rating": 1200,
+    "elo_change": null
+  },
+  "player2": {
+    "uid": "player-2-uuid",
+    "username": "Player2",
+    "elo_rating": 1250,
+    "elo_change": null
+  },
+  "winner_uid": null,
+  "player1_score": 5,
+  "player2_score": 3,
+  "started_at": "2026-05-04T10:15:30Z",
+  "finished_at": null
+}
+```
 
 #### Turn submission
 
@@ -419,6 +626,34 @@ Response model: `SubmitTurnResponse`
 | `player1_score` | `int`                  |
 | `player2_score` | `int`                  |
 
+Example request and response:
+
+```json
+// POST /api/multiplayer/matches/123/turn
+// Request body
+{
+  "tile_id": 5,
+  "question_type": "standard",
+  "question_id": 12,
+  "is_correct": true,
+  "game_state": {
+    "board": [1, 2, 0, 3, 0, 4, 5],
+    "current_turn": "player1"
+  }
+}
+
+// 200 Response
+{
+  "match_id": 123,
+  "tile_id": 5,
+  "question_type": "standard",
+  "question_id": 12,
+  "is_correct": true,
+  "player1_score": 6,
+  "player2_score": 3
+}
+```
+
 #### Forfeit
 
 Response model: `ForfeitResponse`
@@ -429,6 +664,19 @@ Response model: `ForfeitResponse`
 | `status`     | `ongoing`, `completed`, or `aborted` | Final status               |
 | `winner_uid` | `string`                             | Winner UID after forfeit   |
 | `reason`     | `string`                             | The backend uses `forfeit` |
+
+Example response:
+
+```json
+// POST /api/multiplayer/matches/123/forfeit
+// 200 Response
+{
+  "match_id": 123,
+  "status": "completed",
+  "winner_uid": "player-2-uuid",
+  "reason": "forfeit"
+}
+```
 
 #### WebSocket behavior
 
@@ -455,39 +703,246 @@ Outbound events:
 - `match_finished`
 - `error`
 
-Example connection:
+Example connection and messages:
 
-```text
+```
 ws://<host>/api/multiplayer/ws/123?token=<firebase_id_token>
+```
+
+```json
+// Client: ping message
+{
+  "type": "ping"
+}
+
+// Server: pong response
+{
+  "type": "pong",
+  "match_id": 123,
+  "timestamp": "2026-05-04T10:30:45Z"
+}
+```
+
+```json
+// Server: player_connected event
+{
+  "type": "player_connected",
+  "player_uid": "user-uuid-2",
+  "player_username": "opponent_name",
+  "opponent_elo": 1250
+}
+
+// Server: score_updated event
+{
+  "type": "score_updated",
+  "match_id": 123,
+  "player1_score": 3,
+  "player2_score": 2,
+  "latest_turn": {
+    "tile_id": 5,
+    "player_id": "user-uuid-1",
+    "is_correct": true,
+    "question_id": 12,
+    "question_type": "standard"
+  }
+}
+
+// Server: match_finished event
+{
+  "type": "match_finished",
+  "match_id": 123,
+  "status": "completed",
+  "winner_uid": "user-uuid-1",
+  "final_scores": {
+    "player1": 14,
+    "player2": 10
+  },
+  "elo_changes": {
+    "player1": { "from": 1200, "to": 1215, "change": 15 },
+    "player2": { "from": 1250, "to": 1235, "change": -15 }
+  },
+  "finished_at": "2026-05-04T10:45:30Z"
+}
 ```
 
 ## Infrastructure & Deployment
 
-Azure cloud environment setup, resource selection, and the CI/CD pipeline architecture
+Azure cloud environment setup, resource selection, and the CI/CD pipeline architecture.
 
-High-level plan:
+### Development Environment
+
+- **Local development**: Docker & Docker Compose for consistent environment across developers.
+- **Database**: PostgreSQL running in a Docker container locally.
+- **Backend**: FastAPI + Uvicorn in a container.
+- **Frontend**: Vite dev server with hot reload.
+- **Configuration**: Environment variables (`.env`) for local overrides.
+
+### Continuous Integration / Continuous Deployment (CI/CD)
+
+High-level pipeline architecture:
 
 ```mermaid
-flowchart LR
-    FB[Feature Branch]
-    PR[Pull Request]
-    MAIN[Main Branch]
-    DEV[DEV environment]
-    PROD[PROD environment]
+sequenceDiagram
+    actor Dev as Developer
+    participant GitHub as GitHub<br/>Repository
+    participant GHActions as GitHub Actions<br/>CI/CD
+    participant Azure as Azure Cloud<br/>Services
+    participant DEV as DEV Environment<br/>Container Instance
+    participant PROD as PROD Environment<br/>Container App
 
-    FB -- Unit Test & Code Style --> PR
-    PR -- Code Review --> MAIN
-    MAIN -- Build & Test --> DEV
-    DEV -- Integration Tests --> PROD
+    Dev->>GitHub: Push to feature branch
+    GitHub->>GHActions: Trigger workflow
+    GHActions->>GHActions: Run unit tests (pytest, Vitest)
+    GHActions->>GHActions: Lint & code style checks
+
+    Dev->>GitHub: Create Pull Request → Main
+    GitHub->>GHActions: Run PR checks
+    GHActions-->>GitHub: Tests pass / fail status
+
+    Dev->>GitHub: Merge PR to main
+    GitHub->>GHActions: Trigger main branch workflow
+
+    GHActions->>GHActions: Build backend Docker image
+    GHActions->>GHActions: Build frontend Docker image
+    GHActions->>Azure: Push images to Azure Container Registry
+
+    GHActions->>Azure: Deploy to DEV environment
+    Azure->>DEV: Spin up container instances
+    GHActions->>DEV: Run integration tests
+    DEV-->>GHActions: Tests pass / fail
+
+    alt Integration tests pass
+        GHActions->>Azure: Deploy to PROD environment
+        Azure->>PROD: Update running Container App
+        PROD-->>GHActions: Health checks pass
+        GHActions-->>Dev: Deployment successful ✓
+    else Integration tests fail
+        GHActions-->>Dev: Deployment blocked, review logs
+    end
 ```
+
+**Pipeline stages:**
+
+1. **Unit Testing**: Backend (pytest) and frontend (Vitest) tests run in parallel.
+2. **Linting & Code Quality**: ESLint, Prettier, mypy checks.
+3. **Build**: Docker images for backend and frontend are built and tagged with commit SHA and `latest`.
+4. **Registry Push**: Images pushed to Azure Container Registry.
+5. **DEV Deployment**: Container instances deployed in DEV subscription for integration tests.
+6. **Integration Tests**: Full API and multiplayer WebSocket tests run against DEV environment.
+7. **PROD Deployment**: On success, Container App in PROD is updated with new images.
+
+**Key Infrastructure Components:**
+
+- **Azure Container Registry**: Central image repository for backend and frontend.
+- **Azure Container Instances (DEV)**: Ephemeral environments for testing.
+- **Azure Container Apps (PROD)**: Managed, serverless container platform for production workload.
+- **Azure PostgreSQL**: Production database (managed service).
+- **Application Insights**: Logging, tracing, and monitoring (integrated via OpenTelemetry).
+- **GitHub Actions**: Workflow orchestration and automation.
+
+**Deployment Configuration:**
+
+- Environment variables are injected at runtime (e.g., `APPLICATIONINSIGHTS_CONNECTION_STRING`, database credentials).
+- Docker Compose is used for local and DEV multi-container orchestration.
+- PROD runs a reverse proxy (nginx) in front of the FastAPI backend and frontend static files.
+
+**Note on Azure & Deployment Details:**  
+Further refinement of Azure resource allocation, scaling policies, cost optimization, and disaster recovery procedures should be discussed with the deployment owner (Dan).
 
 ## Reliability & Observability
 
 Plan for Logging, Monitoring, Alerting, and defined SLA/SLO/SLI metrics.
 
-Backend logging is centralized in `backend/logging_config.py` and keeps the existing structured JSON stdout output for container logs. When the Azure Container App exposes `APPLICATIONINSIGHTS_CONNECTION_STRING`, the backend also initializes Azure Monitor OpenTelemetry so the same Python logs are exported to Application Insights.
+### Logging
 
-Request IDs and request metadata are attached to each log record to make traces and failures easier to correlate in Azure.
+Backend logging is centralized in `backend/logging_config.py` and outputs structured JSON to stdout for container logs. When the Azure Container App exposes `APPLICATIONINSIGHTS_CONNECTION_STRING`, the backend also initializes Azure Monitor OpenTelemetry so the same Python logs are exported to Application Insights.
+
+**Log Structure:**
+
+- **Request ID**: Attached to each log record to correlate logs from a single request across services.
+- **Request Metadata**: User UID, endpoint, method, response status, and duration.
+- **Service Logs**: Service-level operations (user lookup, question selection, matchmaking, turn validation).
+- **Error Logs**: Full stack traces, context, and user action leading to the error.
+
+**Log Levels:**
+
+- `DEBUG`: Detailed diagnostic info (token validation, cache hits).
+- `INFO`: Notable events (user login, match created, question delivered).
+- `WARNING`: Recoverable issues (malformed input, cache miss, stale connection).
+- `ERROR`: Failures requiring action (DB connection lost, invalid token, business logic violation).
+- `CRITICAL`: System failures (startup errors, unrecoverable database issues).
+
+**Example log entry (JSON):**
+
+```json
+{
+  "timestamp": "2026-05-04T10:30:45.123Z",
+  "level": "INFO",
+  "request_id": "req-abc123",
+  "service": "multiplayer",
+  "action": "match_created",
+  "player1_uid": "user-1",
+  "player2_uid": "user-2",
+  "match_id": 456,
+  "elo_diff": 35,
+  "message": "Match created with Elo window 100"
+}
+```
+
+### Monitoring & Observability
+
+**Azure Monitor Integration:**
+
+- All backend HTTP requests and WebSocket connections are traced via OpenTelemetry.
+- Dependencies (PostgreSQL queries) are tracked with duration and status.
+- Custom metrics track game events (matches created, turns submitted, questions served).
+
+**Key Metrics (SLI — Service Level Indicators):**
+
+| Metric                              | Target        | Description                                                             |
+| ----------------------------------- | ------------- | ----------------------------------------------------------------------- |
+| **API Availability**                | ≥ 99%         | Percentage of HTTP requests returning 2xx/3xx.                          |
+| **API Latency (p95)**               | < 500 ms      | 95th percentile response time for protected endpoints.                  |
+| **WebSocket Connection Success**    | ≥ 99%         | Percentage of successful WebSocket connections for authenticated users. |
+| **WebSocket Disconnect Rate**       | < 5% per hour | Unexpected disconnections during active matches.                        |
+| **Question Delivery Latency (p95)** | < 200 ms      | Time to fetch and serve a question.                                     |
+| **Matchmaking Wait (p95)**          | < 60 seconds  | Time for a player to be matched (within Elo window).                    |
+| **Match Completion Rate**           | ≥ 95%         | Percentage of initiated matches that complete (not aborted).            |
+| **Database Query Latency (p95)**    | < 100 ms      | 95th percentile query execution time.                                   |
+| **Error Rate**                      | < 1%          | Percentage of requests returning 5xx status.                            |
+
+**Alerting Rules (based on SLO — Service Level Objectives):**
+
+- Alert if API availability < 98% over 5 minutes.
+- Alert if API latency p95 > 1 second over 5 minutes.
+- Alert if error rate > 2% over 5 minutes.
+- Alert if WebSocket disconnect rate > 10% per hour.
+- Alert if database connection pool exhausted.
+- Alert if matchmaking queue > 100 players for > 5 minutes.
+
+### High Availability & Resilience
+
+**Current Design Considerations:**
+
+- **Connection Pooling**: Database connections are pooled to avoid exhaustion.
+- **Request Timeout**: HTTP requests timeout after 30 seconds; WebSocket pings verify connectivity.
+- **Graceful Degradation**: If the database is temporarily unavailable, some endpoints may return cached responses or queue operations for retry.
+- **Circuit Breaker Pattern**: Consider implementing circuit breakers for external services (Firebase, AI API) in future iterations.
+
+**Recovery Procedures:**
+
+- **Database Failover**: PostgreSQL managed service in Azure provides automatic failover.
+- **Container Restart**: Container orchestration automatically restarts failed containers.
+- **Queue Cleanup**: Stale matchmaking queue entries are pruned periodically (e.g., after 30 minutes of inactivity).
+- **Match Recovery**: Matches with no activity for > 1 hour are marked `aborted` and cleaned up.
+
+### Future Improvements
+
+- Real-time dashboard for match statistics, queue depth, and error rates.
+- Distributed tracing across frontend → backend → database for complex flows.
+- Performance profiling to identify bottlenecks in question selection and Elo calculation.
+- Chaos engineering tests for network partitions and database unavailability.
+- Automated capacity planning based on queue depth trends.
 
 ## Security Architecture
 
