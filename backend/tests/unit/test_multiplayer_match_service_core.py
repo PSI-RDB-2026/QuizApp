@@ -77,7 +77,7 @@ async def test_submit_turn_updates_score(monkeypatch):
 @pytest.mark.asyncio
 async def test_update_elo_and_finalize(monkeypatch):
     # mock _get_user to return user dicts with elo ratings
-    async def fake_get(uid):
+    async def fake_get(uid, conn=None):
         return {"uid": uid, "elo_rating": 1200 if uid == "w" else 1100}
 
     async def fake_execute(query, params=None):
