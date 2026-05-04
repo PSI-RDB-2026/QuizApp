@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { GoogleIcon } from "./General/CustomIcons";
 import { useAuth } from "app/providers/AuthProvider";
-import { getLogin, type ApiErrorResponse, type TokenResponse } from "api/api";
+import { type ApiErrorResponse, type TokenResponse } from "api/api";
 import { googleLogin, loginUser } from "app/firebase/authentication";
 
 interface Props {
