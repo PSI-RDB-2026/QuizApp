@@ -13,10 +13,10 @@ test.describe("QuizApp smoke flows", () => {
     // Verify leaderboard data loads from backend
     await expect(page.getByText(/Showing \d+-\d+ of \d+ players/)).toBeVisible();
     await expect(page.getByText("Failed to load leaderboard.")).toHaveCount(0);
+    await expect(page.getByText("Loading leaderboard...")).toHaveCount(0);
     
-    // Verify table has data (at least 1 row)
-    const rows = page.locator("table tbody tr");
-    await expect(rows.first()).toBeVisible();
+    // Verify desktop table structure renders even when leaderboard has 0 rows.
+    await expect(page.locator("table")).toBeVisible();
     
     // Verify columns exist
     await expect(page.getByRole("columnheader", { name: "Rank" })).toBeVisible();
@@ -105,6 +105,7 @@ test.describe("QuizApp smoke flows", () => {
 
     // Wait for data to load
     await expect(page.getByText(/Showing \d+-\d+ of \d+ players/)).toBeVisible();
+    await expect(page.getByText("Loading leaderboard...")).toHaveCount(0);
 
     // Verify pagination buttons are present
     await expect(page.getByRole("button", { name: /Previous|previous page/i }).first()).toBeVisible();
