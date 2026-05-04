@@ -4,6 +4,13 @@ This document presents the technical plan for implementing QuizApp project.
 
 ## Architecture
 
+### Scope
+
+- Browser clients talk to the backend over HTTP for regular API calls.
+- Multiplayer uses WebSocket for live state changes and HTTP for match actions.
+- PostgreSQL stores users, questions, matches, and turns.
+- Azure hosts the deployed stack, with GitHub Actions driving CI/CD.
+
 ```mermaid
 flowchart LR
     Browser[Browser]
@@ -107,7 +114,7 @@ Original DB diagram is in [/diagrams/DB-diagram.md](../diagrams/DB-diagram.png)
 
 ## Interaction Design
 
-### Single-Player Mode
+### Single-Player Flow
 
 ```mermaid
 sequenceDiagram
@@ -134,9 +141,9 @@ sequenceDiagram
     Frontend-->>Player: Show score & summary
 ```
 
-**Communication:** HTTP/REST only. Answers are evaluated locally or checked one-at-a-time. Client may submit collected results after quiz completion.
+**Communication:** HTTP/REST only. Answers are evaluated locally or checked one-at-a-time. The client may submit collected results after quiz completion.
 
-### Multiplayer Mode - Match Setup
+### Multiplayer Matchmaking
 
 ```mermaid
 sequenceDiagram
@@ -175,7 +182,7 @@ sequenceDiagram
     Frontend1-->>P1: Display opponent, ready to play
 ```
 
-### Multiplayer Mode - Real-Time Gameplay via WebSocket
+### Multiplayer WebSocket Flow
 
 ```mermaid
 sequenceDiagram
@@ -259,15 +266,17 @@ sequenceDiagram
 
 All endpoints are prefixed with `/api`.
 
-### API & Auth (exact backend mechanics)
+### Authentication & Routing
 
-All backend endpoints are prefixed with `/api`. The backend uses Firebase Authentication for identity; HTTP endpoints validate an incoming Firebase ID token via the `get_firebase_id` dependency and map the verified UID to a local user record.
+The backend uses Firebase Authentication for identity. HTTP endpoints validate an incoming Firebase ID token via the `get_firebase_id` dependency and map the verified UID to a local user record.
 
 Key backend mechanics:
 
 - HTTP authentication: clients must include `Authorization: Bearer <firebase_id_token>` for protected endpoints. The FastAPI dependency `get_firebase_id` extracts and verifies the token, returning the Firebase UID.
 - Local user mapping: after verification the backend looks up the user in the local DB (via `UserServices.get_user(uid)`) and will create a local user record when requested by endpoints like `/api/users/register` or lazily on first use.
 - WebSocket authentication: the multiplayer WebSocket (`/api/multiplayer/ws/{match_id}`) accepts a token either via `?token=<token>` query parameter or an `Authorization: Bearer <token>` header. For WebSocket connections the code may use `UserServices.get_user_from_token(token)` (legacy token support) to resolve a user row.
+
+### Users API
 
 User-related endpoints (as implemented in `backend/routers/Users.py`):
 
@@ -276,10 +285,14 @@ User-related endpoints (as implemented in `backend/routers/Users.py`):
 - `GET /api/users/info` — Returns the authenticated user's `uid`, `username`, and `elo_rating`. Requires Firebase token.
 - `GET /api/users/leaderboard?limit=30` — Returns the top users ranked by Elo. Public read; implemented in backend and returns `leaderboard` array.
 
+### Questions API
+
 Questions endpoints (as implemented in `backend/routers/questions.py`):
 
 - `GET /api/questions?question_type=standard|yes_no` — Returns a single random question filtered by `question_type`. Public.
 - `POST /api/questions/check` — Accepts `question_id`, `answer`, and `question_type` and returns `{ is_correct, correct_answer }`. Public.
+
+### Multiplayer API
 
 Multiplayer endpoints and WebSocket (as implemented in `backend/routers/multiplayer.py`):
 
@@ -291,29 +304,40 @@ Multiplayer endpoints and WebSocket (as implemented in `backend/routers/multipla
 - `POST /api/multiplayer/matches/{match_id}/forfeit` — Forfeit an ongoing match; clears snapshots and broadcasts match finish.
 - `WebSocket /api/multiplayer/ws/{match_id}` — Real-time channel. Client must provide a token via `?token=` or `Authorization` header. Server verifies the token (supports legacy token lookup via `UserServices.get_user_from_token`) and then connects the player to realtime service. The socket accepts messages (`ping`, `state_request`, `game_snapshot`, `timer_update`) and broadcasts `player_connected`, `player_disconnected`, `score_updated`, `game_snapshot`, `match_snapshot`, `match_finished`, etc.
 
-Authentication notes — exact mechanics
+### Authentication Notes
 
 - HTTP endpoints use `get_firebase_id` (FastAPI dependency) to extract and validate Firebase ID tokens. The dependency returns the Firebase `uid` that service layers use to map to local users.
 - In multiplayer routes a higher-level helper `_get_authenticated_user` attempts a DB lookup for the UID, but falls back to an in-memory cache (`deps._user_token_cache`) when the DB is unavailable or the user is not yet persisted.
 - WebSocket connections support legacy token-based lookup via `UserServices.get_user_from_token(token)`; this is used for compatibility with older clients or non-Firebase tokens.
 
-Examples
+### Examples
 
-1. Typical authenticated HTTP request (protected endpoint):
+```json
+// Typical authenticated HTTP request (protected endpoint)
+{
+  "method": "GET",
+  "path": "/api/users/info",
+  "headers": {
+    "Authorization": "Bearer <firebase_id_token>"
+  }
+}
+```
 
-Header: `Authorization: Bearer <firebase_id_token>`
+```json
+// Preferred WebSocket connection
+{
+  "websocket_url": "ws://<host>/api/multiplayer/ws/123?token=<firebase_id_token>",
+  "fallback_headers": {
+    "Authorization": "Bearer <firebase_id_token>"
+  },
+  "on_invalid_token": {
+    "close_code": 1008,
+    "detail": "Token is missing or invalid"
+  }
+}
+```
 
-2. WebSocket connection (preferred):
-
-ws://<host>/api/multiplayer/ws/123?token=<firebase_id_token>
-
-Or with header during handshake:
-
-Authorization: Bearer <firebase_id_token>
-
-If the token is missing or invalid the WebSocket is closed with code `1008`.
-
-Authentication & WebSocket flowchart (backend specifics)
+### Authentication & WebSocket Flow
 
 ```mermaid
 flowchart LR
@@ -344,11 +368,9 @@ flowchart LR
         class FirebaseAuth external;
 ```
 
-### Questions API
-
 The questions router is implemented in `backend/routers/questions.py` and is fully public.
 
-#### Endpoints
+#### Endpoint Overview
 
 | Method | Path                   | Auth | Description                            |
 | ------ | ---------------------- | ---- | -------------------------------------- |
@@ -460,8 +482,6 @@ Example requests:
   "correct_answer": true
 }
 ```
-
-### Multiplayer API
 
 The multiplayer router is implemented in `backend/routers/multiplayer.py`. HTTP endpoints require authenticated Firebase users via `get_firebase_id`; the WebSocket endpoint accepts a token in the query string or Authorization header.
 
@@ -769,7 +789,7 @@ ws://<host>/api/multiplayer/ws/123?token=<firebase_id_token>
 
 Azure cloud environment setup, resource selection, and the CI/CD pipeline architecture.
 
-### Development Environment
+### Local Development
 
 - **Local development**: Docker & Docker Compose for consistent environment across developers.
 - **Database**: PostgreSQL running in a Docker container locally.
@@ -777,7 +797,7 @@ Azure cloud environment setup, resource selection, and the CI/CD pipeline archit
 - **Frontend**: Vite dev server with hot reload.
 - **Configuration**: Environment variables (`.env`) for local overrides.
 
-### Continuous Integration / Continuous Deployment (CI/CD)
+### CI/CD Pipeline
 
 High-level pipeline architecture:
 
@@ -889,7 +909,7 @@ Backend logging is centralized in `backend/logging_config.py` and outputs struct
 }
 ```
 
-### Monitoring & Observability
+### Monitoring
 
 **Azure Monitor Integration:**
 
@@ -920,7 +940,7 @@ Backend logging is centralized in `backend/logging_config.py` and outputs struct
 - Alert if database connection pool exhausted.
 - Alert if matchmaking queue > 100 players for > 5 minutes.
 
-### High Availability & Resilience
+### Resilience
 
 **Current Design Considerations:**
 
