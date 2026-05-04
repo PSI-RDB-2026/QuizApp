@@ -23,17 +23,31 @@ class FakeWebSocket:
         return "{}"
 
 
+@pytest.fixture(autouse=True)
+def reset_realtime_state():
+    setattr(MultiplayerRealtimeService, "_connections", {})
+    setattr(MultiplayerRealtimeService, "_disconnect_tasks", {})
+    setattr(MultiplayerRealtimeService, "_match_start_tasks", {})
+    setattr(MultiplayerRealtimeService, "_snapshots", {})
+    yield
+    setattr(MultiplayerRealtimeService, "_connections", {})
+    setattr(MultiplayerRealtimeService, "_disconnect_tasks", {})
+    setattr(MultiplayerRealtimeService, "_match_start_tasks", {})
+    setattr(MultiplayerRealtimeService, "_snapshots", {})
+
+
 @pytest.mark.asyncio
 async def test_connect_and_disconnect():
     ws = FakeWebSocket()
     await MultiplayerRealtimeService.connect(1, "p1", ws)
-    assert MultiplayerRealtimeService._connections[1]["p1"] is ws
+    assert getattr(MultiplayerRealtimeService, "_connections")[1]["p1"] is ws
+    assert MultiplayerRealtimeService.get_connected_player_uids(1) == {"p1"}
     MultiplayerRealtimeService.disconnect(1, "p1")
-    assert 1 not in MultiplayerRealtimeService._connections
+    assert 1 not in getattr(MultiplayerRealtimeService, "_connections")
 
 
 @pytest.mark.asyncio
-async def test_broadcast_and_send_to_player(monkeypatch):
+async def test_broadcast_and_send_to_player():
     ws1 = FakeWebSocket()
     ws2 = FakeWebSocket()
     await MultiplayerRealtimeService.connect(2, "a", ws1)
@@ -47,7 +61,7 @@ async def test_broadcast_and_send_to_player(monkeypatch):
 
     await MultiplayerRealtimeService.broadcast(2, "ev", {"x": 1})
     # ws1 should be removed, ws2 should have received
-    assert "a" not in MultiplayerRealtimeService._connections.get(2, {})
+    assert "a" not in getattr(MultiplayerRealtimeService, "_connections").get(2, {})
     assert any(s for (t, s) in ws2.sent if t == "text")
 
     # send_to_player for non-existing player does nothing
@@ -59,15 +73,46 @@ async def test_broadcast_and_send_to_player(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_disconnect_timer(monkeypatch):
+async def test_disconnect_timer():
     called = {}
 
     async def on_timeout(match_id, uid):
         called["ok"] = (match_id, uid)
 
-    # set grace to very small
-    MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS = 0
-    MultiplayerRealtimeService.schedule_disconnect_timer(3, "z", on_timeout)
-    # allow background task to run
-    await asyncio.sleep(0.01)
-    assert called.get("ok") == (3, "z")
+    previous_value = MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS
+    try:
+        MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS = 0
+        MultiplayerRealtimeService.schedule_disconnect_timer(3, "z", on_timeout)
+        await asyncio.sleep(0.01)
+        assert called.get("ok") == (3, "z")
+    finally:
+        MultiplayerRealtimeService.DISCONNECT_GRACE_SECONDS = previous_value
+
+
+@pytest.mark.asyncio
+async def test_match_ready_helpers():
+    ws1 = FakeWebSocket()
+    ws2 = FakeWebSocket()
+    await MultiplayerRealtimeService.connect(4, "p1", ws1)
+    assert MultiplayerRealtimeService.has_both_players_connected(4, {"p1", "p2"}) is False
+
+    await MultiplayerRealtimeService.connect(4, "p2", ws2)
+    assert MultiplayerRealtimeService.has_both_players_connected(4, {"p1", "p2"}) is True
+
+
+@pytest.mark.asyncio
+async def test_match_start_timer():
+    called = {}
+
+    async def on_timeout(match_id):
+        called["ok"] = match_id
+
+    previous_value = MultiplayerRealtimeService.MATCH_START_GRACE_SECONDS
+    try:
+        MultiplayerRealtimeService.MATCH_START_GRACE_SECONDS = 0
+        MultiplayerRealtimeService.schedule_match_start_timer(8, on_timeout)
+        await asyncio.sleep(0.01)
+
+        assert called.get("ok") == 8
+    finally:
+        MultiplayerRealtimeService.MATCH_START_GRACE_SECONDS = previous_value

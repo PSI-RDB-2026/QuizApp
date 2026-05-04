@@ -60,7 +60,7 @@ export default function Leaderboards() {
       try {
         setLoading(true);
         const data = await getLeaderboard(100);
-        setLeaderboard(data);
+        setLeaderboard(data as LeaderboardEntry[]);
       } catch (err) {
         console.error("Error fetching leaderboard:", err);
         setError("Failed to load leaderboard.");
@@ -100,13 +100,12 @@ export default function Leaderboards() {
             p={{ base: 4, md: 5 }}
           >
             <Button
-              alignSelf={{ base: "stretch", md: "auto" }}
-              variant="outline"
-              colorPalette="green"
-              bg={panelBg}
               onClick={() => navigate("/")}
+              variant={"surface"}
+              colorPalette={"green"}
+              mb={5}
             >
-              Back to Menu
+              &larr; Back to Main Menu
             </Button>
           </Flex>
 

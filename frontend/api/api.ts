@@ -137,7 +137,7 @@ export interface SubmitTurnResponse {
 export interface ForfeitResponse {
   match_id: number;
   status: MultiplayerMatchStatus;
-  winner_email: string;
+  winner_uid: string;
   reason: string;
 }
 
