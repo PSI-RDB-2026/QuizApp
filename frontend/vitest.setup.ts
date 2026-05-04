@@ -281,16 +281,16 @@ const server = setupServer(
       id: Number(params.matchId),
       status: "ongoing",
       player1: {
-        email: "p1@example.com",
+        uid: "p1-uid",
         username: "player1",
         elo_rating: 1500,
       },
       player2: {
-        email: "p2@example.com",
+        uid: "p2-uid",
         username: "player2",
         elo_rating: 1510,
       },
-      winner_email: null,
+      winner_uid: null,
       player1_score: 2,
       player2_score: 1,
       started_at: "2026-05-01T00:00:00Z",
@@ -341,7 +341,7 @@ const server = setupServer(
       return HttpResponse.json({
         match_id: Number(params.matchId),
         status: "completed",
-        winner_email: "p2@example.com",
+        winner_uid: "p2-uid",
         reason: "forfeit",
       });
     },
