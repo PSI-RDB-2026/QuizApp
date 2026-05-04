@@ -807,8 +807,7 @@ sequenceDiagram
     participant GitHub as GitHub<br/>Repository
     participant GHActions as GitHub Actions<br/>CI/CD
     participant Azure as Azure Cloud<br/>Services
-    participant DEV as DEV Environment<br/>Container Instance
-    participant PROD as PROD Environment<br/>Container App
+    participant DEV as Environment<br/>Container Instance
 
     Dev->>GitHub: Push to feature branch
     GitHub->>GHActions: Trigger workflow
@@ -825,19 +824,7 @@ sequenceDiagram
     GHActions->>GHActions: Build backend Docker image
     GHActions->>GHActions: Build frontend Docker image
     GHActions->>Azure: Push images to Azure Container Registry
-
-    GHActions->>Azure: Deploy to DEV environment
     Azure->>DEV: Spin up container instances
-    GHActions->>DEV: Run integration tests
-    DEV-->>GHActions: Tests pass / fail
-
-    alt Integration tests pass
-        GHActions->>Azure: Deploy to PROD environment
-        Azure->>PROD: Update running Container App
-        PROD-->>GHActions: Health checks pass
-        GHActions-->>Dev: Deployment successful ✓
-    else Integration tests fail
-        GHActions-->>Dev: Deployment blocked, review logs
     end
 ```
 
@@ -847,15 +834,12 @@ sequenceDiagram
 2. **Linting & Code Quality**: ESLint, Prettier, mypy checks.
 3. **Build**: Docker images for backend and frontend are built and tagged with commit SHA and `latest`.
 4. **Registry Push**: Images pushed to Azure Container Registry.
-5. **DEV Deployment**: Container instances deployed in DEV subscription for integration tests.
-6. **Integration Tests**: Full API and multiplayer WebSocket tests run against DEV environment.
-7. **PROD Deployment**: On success, Container App in PROD is updated with new images.
+5. **Deployment**: Container instances deployed in subscription.
 
 **Key Infrastructure Components:**
 
 - **Azure Container Registry**: Central image repository for backend and frontend.
-- **Azure Container Instances (DEV)**: Ephemeral environments for testing.
-- **Azure Container Apps (PROD)**: Managed, serverless container platform for production workload.
+- **Azure Container App**: Managed, serverless container platform for production workload.
 - **Azure PostgreSQL**: Production database (managed service).
 - **Application Insights**: Logging, tracing, and monitoring (integrated via OpenTelemetry).
 - **GitHub Actions**: Workflow orchestration and automation.
@@ -865,9 +849,6 @@ sequenceDiagram
 - Environment variables are injected at runtime (e.g., `APPLICATIONINSIGHTS_CONNECTION_STRING`, database credentials).
 - Docker Compose is used for local and DEV multi-container orchestration.
 - PROD runs a reverse proxy (nginx) in front of the FastAPI backend and frontend static files.
-
-**Note on Azure & Deployment Details:**  
-Further refinement of Azure resource allocation, scaling policies, cost optimization, and disaster recovery procedures should be discussed with the deployment owner (Dan).
 
 ## Reliability & Observability
 
@@ -911,34 +892,10 @@ Backend logging is centralized in `backend/logging_config.py` and outputs struct
 
 ### Monitoring
 
-**Azure Monitor Integration:**
+**Azure Insights Integration:**
 
 - All backend HTTP requests and WebSocket connections are traced via OpenTelemetry.
 - Dependencies (PostgreSQL queries) are tracked with duration and status.
-- Custom metrics track game events (matches created, turns submitted, questions served).
-
-**Key Metrics (SLI — Service Level Indicators):**
-
-| Metric                              | Target        | Description                                                             |
-| ----------------------------------- | ------------- | ----------------------------------------------------------------------- |
-| **API Availability**                | ≥ 99%         | Percentage of HTTP requests returning 2xx/3xx.                          |
-| **API Latency (p95)**               | < 500 ms      | 95th percentile response time for protected endpoints.                  |
-| **WebSocket Connection Success**    | ≥ 99%         | Percentage of successful WebSocket connections for authenticated users. |
-| **WebSocket Disconnect Rate**       | < 5% per hour | Unexpected disconnections during active matches.                        |
-| **Question Delivery Latency (p95)** | < 200 ms      | Time to fetch and serve a question.                                     |
-| **Matchmaking Wait (p95)**          | < 60 seconds  | Time for a player to be matched (within Elo window).                    |
-| **Match Completion Rate**           | ≥ 95%         | Percentage of initiated matches that complete (not aborted).            |
-| **Database Query Latency (p95)**    | < 100 ms      | 95th percentile query execution time.                                   |
-| **Error Rate**                      | < 1%          | Percentage of requests returning 5xx status.                            |
-
-**Alerting Rules (based on SLO — Service Level Objectives):**
-
-- Alert if API availability < 98% over 5 minutes.
-- Alert if API latency p95 > 1 second over 5 minutes.
-- Alert if error rate > 2% over 5 minutes.
-- Alert if WebSocket disconnect rate > 10% per hour.
-- Alert if database connection pool exhausted.
-- Alert if matchmaking queue > 100 players for > 5 minutes.
 
 ### Resilience
 
