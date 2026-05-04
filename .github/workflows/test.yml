@@ -36,6 +36,8 @@ jobs:
         with:
           files: ./backend/coverage.xml
           flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: PSI-RDB-2026/QuizApp
           name: backend-coverage
           fail_ci_if_error: false
 
@@ -66,6 +68,8 @@ jobs:
         with:
           files: ./frontend/coverage/coverage-final.json
           flags: frontend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: PSI-RDB-2026/QuizApp
           name: frontend-coverage
           fail_ci_if_error: false
 
