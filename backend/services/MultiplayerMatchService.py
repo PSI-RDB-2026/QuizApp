@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import HTTPException
 
-from db.database import execute, fetch_one
+from db.database import execute, execute_on_connection, fetch_one, transaction
 
 
 class MultiplayerMatchService:
@@ -12,15 +12,27 @@ class MultiplayerMatchService:
         return dict(await MultiplayerMatchService._get_user(uid))
 
     @staticmethod
-    async def _get_user(uid: str):
-        user = await fetch_one(
-            """
-            SELECT firebase_uid AS uid, username, elo_rating
-            FROM users
-            WHERE firebase_uid = :uid
-            """,
-            {"uid": uid},
-        )
+    async def _get_user(uid: str, conn=None):
+        if conn is None:
+            user = await fetch_one(
+                """
+                SELECT firebase_uid AS uid, username, elo_rating
+                FROM users
+                WHERE firebase_uid = :uid
+                """,
+                {"uid": uid},
+            )
+        else:
+            result = await execute_on_connection(
+                conn,
+                """
+                SELECT firebase_uid AS uid, username, elo_rating
+                FROM users
+                WHERE firebase_uid = :uid
+                """,
+                {"uid": uid},
+            )
+            user = result.fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return user._mapping
@@ -191,29 +203,49 @@ class MultiplayerMatchService:
         return winner_delta, loser_delta
 
     @staticmethod
-    async def _update_elo(winner_uid: str, loser_uid: str) -> tuple[int, int]:
-        winner = await MultiplayerMatchService._get_user(winner_uid)
-        loser = await MultiplayerMatchService._get_user(loser_uid)
+    async def _update_elo(winner_uid: str, loser_uid: str, conn=None) -> tuple[int, int]:
+        winner = await MultiplayerMatchService._get_user(winner_uid, conn=conn)
+        loser = await MultiplayerMatchService._get_user(loser_uid, conn=conn)
         winner_delta, loser_delta = MultiplayerMatchService._elo_delta(
             winner["elo_rating"], loser["elo_rating"]
         )
 
-        await execute(
-            """
-            UPDATE users
-            SET elo_rating = elo_rating + :elo_delta
-            WHERE firebase_uid = :uid
-            """,
-            {"elo_delta": winner_delta, "uid": winner_uid},
-        )
-        await execute(
-            """
-            UPDATE users
-            SET elo_rating = elo_rating + :elo_delta
-            WHERE firebase_uid = :uid
-            """,
-            {"elo_delta": loser_delta, "uid": loser_uid},
-        )
+        if conn is None:
+            await execute(
+                """
+                UPDATE users
+                SET elo_rating = elo_rating + :elo_delta
+                WHERE firebase_uid = :uid
+                """,
+                {"elo_delta": winner_delta, "uid": winner_uid},
+            )
+            await execute(
+                """
+                UPDATE users
+                SET elo_rating = elo_rating + :elo_delta
+                WHERE firebase_uid = :uid
+                """,
+                {"elo_delta": loser_delta, "uid": loser_uid},
+            )
+        else:
+            await execute_on_connection(
+                conn,
+                """
+                UPDATE users
+                SET elo_rating = elo_rating + :elo_delta
+                WHERE firebase_uid = :uid
+                """,
+                {"elo_delta": winner_delta, "uid": winner_uid},
+            )
+            await execute_on_connection(
+                conn,
+                """
+                UPDATE users
+                SET elo_rating = elo_rating + :elo_delta
+                WHERE firebase_uid = :uid
+                """,
+                {"elo_delta": loser_delta, "uid": loser_uid},
+            )
         return winner_delta, loser_delta
 
     @staticmethod
@@ -227,53 +259,38 @@ class MultiplayerMatchService:
         if winner_uid not in participants:
             raise HTTPException(status_code=400, detail="Winner must be a participant")
 
-        loser_uid = (
-            participants[1] if participants[0] == winner_uid else participants[0]
-        )
-        winner_delta, loser_delta = await MultiplayerMatchService._update_elo(
-            winner_uid,
-            loser_uid,
-        )
+        loser_uid = participants[1] if participants[0] == winner_uid else participants[0]
 
-        player1_delta = (
-            winner_delta if match["player1"]["uid"] == winner_uid else loser_delta
-        )
-        player2_delta = (
-            winner_delta if match["player2"]["uid"] == winner_uid else loser_delta
-        )
+        async with transaction() as conn:
+            winner_delta, loser_delta = await MultiplayerMatchService._update_elo(
+                winner_uid,
+                loser_uid,
+                conn=conn,
+            )
 
-        await execute(
-            """
-            UPDATE matches
-            SET winner_id = :winner_id,
-                player1_elo_change = :player1_elo_change,
-                player2_elo_change = :player2_elo_change,
-                status = :status,
-                finished_at = :finished_at
-            WHERE id = :match_id
-            """,
-            {
-                "winner_id": winner_uid,
-                "player1_elo_change": player1_delta,
-                "player2_elo_change": player2_delta,
-                "status": status,
-                "finished_at": datetime.utcnow(),
-                "match_id": match_id,
-            },
-        )
+            player1_delta = winner_delta if match["player1"]["uid"] == winner_uid else loser_delta
+            player2_delta = winner_delta if match["player2"]["uid"] == winner_uid else loser_delta
 
-        # Clean up in-memory runtime state. Keep websocket connections intact
-        # so the router can broadcast `match_finished` before clients close.
-        try:
-            from services.MultiplayerRealtimeService import MultiplayerRealtimeService
-
-            MultiplayerRealtimeService.clear_snapshot(match_id)
-        except Exception:
-            # If realtime service is unavailable (tests/mocks), ignore cleanup.
-            pass
-
-        # Remove runtime scores map for this match.
-        MultiplayerMatchService._runtime_scores.pop(match_id, None)
+            await execute_on_connection(
+                conn,
+                """
+                UPDATE matches
+                SET winner_id = :winner_id,
+                    player1_elo_change = :player1_elo_change,
+                    player2_elo_change = :player2_elo_change,
+                    status = :status,
+                    finished_at = :finished_at
+                WHERE id = :match_id
+                """,
+                {
+                    "winner_id": winner_uid,
+                    "player1_elo_change": player1_delta,
+                    "player2_elo_change": player2_delta,
+                    "status": status,
+                    "finished_at": datetime.utcnow(),
+                    "match_id": match_id,
+                },
+            )
 
         return await MultiplayerMatchService.get_match(match_id)
 

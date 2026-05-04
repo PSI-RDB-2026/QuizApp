@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Literal
 
 from models.QuestionModels import (
@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/questions", tags=["questions"])
 @router.get("", response_model=GetQuestionResponse)
 async def get_question(
     question_type: Literal["standard", "yes_no"] = "standard",
+    excluded_ids: list[int] | None = Query(None),
 ) -> GetQuestionResponse:
-    """Returns one random question, filtered by `question_type`."""
-    question_item = await QuestionsService.get_rand_question(question_type)
+    """Returns one random question, filtered by `question_type`, excluding questions already used in the match."""
+    question_item = await QuestionsService.get_rand_question(question_type, excluded_ids)
     if not question_item:
         raise HTTPException(status_code=404, detail="No questions found")
 

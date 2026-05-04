@@ -9,6 +9,8 @@ def test_row_to_mapping_dummy():
     assert hasattr(database, "fetch_one")
     assert hasattr(database, "fetch_all")
     assert hasattr(database, "execute")
+    assert hasattr(database, "execute_on_connection")
+    assert hasattr(database, "transaction")
 
 
 def test_init_db_noop(monkeypatch):
