@@ -93,7 +93,7 @@ def mock_question_db(monkeypatch):
         },
     ]
 
-    async def fake_get_rand_question(question_type="standard"):
+    async def fake_get_rand_question(question_type="standard", excluded_ids=None):
         if question_type == "yes_no":
             question = mock_yes_no[0]
             return dict(question, question_type="yes_no")
